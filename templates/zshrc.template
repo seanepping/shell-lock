@@ -1,0 +1,101 @@
+# 🔐 Shell-Lock Secure Zsh Configuration Template
+# This template provides a hardened zsh configuration with security monitoring
+
+# =============================================================================
+# SECURITY HEADER - DO NOT MODIFY
+# =============================================================================
+
+# Security startup integration - REQUIRED for shell-lock protection
+if [[ "$-" == *i* ]] && [[ -f "$HOME/.local/bin/dev-startup" ]]; then
+    # Interactive shell detected - run security startup
+    # Disable globbing temporarily to prevent ANSI escape sequence issues
+    setopt noglob 2>/dev/null || true
+    source "$HOME/.local/bin/dev-startup" || {
+        echo "⚠️  Security startup failed - emergency shell mode"
+        # Emergency recovery function
+        emergency_shell() {
+            echo "🚨 Starting emergency shell with clean environment"
+            /usr/bin/env -i \
+                HOME="$HOME" \
+                USER="$USER" \
+                PATH="/usr/local/bin:/usr/bin:/bin" \
+                TERM="$TERM" \
+                /bin/bash --norc --noprofile
+        }
+        
+        # Offer emergency shell option
+        echo "Type 'emergency_shell' for clean environment or 'exit' to quit"
+    }
+    # Re-enable globbing
+    unsetopt noglob 2>/dev/null || true
+fi
+
+# Security monitoring integration
+if [[ -f "$HOME/.local/bin/security-check" ]]; then
+    # Run security check in background (non-blocking)
+    nohup "$HOME/.local/bin/security-check" >/dev/null 2>&1 &
+fi
+
+# =============================================================================
+# USER CONFIGURATION AREA
+# =============================================================================
+# Place your custom zsh configuration below this line
+
+# Example: Oh My Zsh integration (if using)
+# export ZSH="$HOME/.oh-my-zsh"
+# ZSH_THEME="robbyrussell"
+# plugins=(git docker kubectl)
+# source $ZSH/oh-my-zsh.sh
+
+# Example: Basic aliases
+# alias ll='ls -alF'
+# alias la='ls -A'
+# alias l='ls -CF'
+
+# Example: Development environment variables
+# export EDITOR=vim
+# export BROWSER=zen
+
+# Example: Language and locale
+# export LANG=en_US.UTF-8
+# export LC_ALL=en_US.UTF-8
+
+# Example: History configuration
+setopt HIST_VERIFY
+setopt HIST_EXPIRE_DUPS_FIRST
+setopt HIST_IGNORE_DUPS
+setopt HIST_IGNORE_ALL_DUPS
+setopt HIST_FIND_NO_DUPS
+setopt HIST_SAVE_NO_DUPS
+
+# Example: Auto-completion
+autoload -Uz compinit
+compinit
+
+# Example: Prompt customization
+# PS1='%n@%m:%~$ '
+
+# =============================================================================
+# SECURITY FOOTER - DO NOT MODIFY
+# =============================================================================
+
+# SSH agent setup (if available)
+if [[ -f "$HOME/.local/bin/ssh-agent-setup" ]]; then
+    source "$HOME/.local/bin/ssh-agent-setup"
+fi
+
+# Secure shell functions
+restore-zshrc() {
+    if command -v secure-recovery >/dev/null 2>&1; then
+        secure-recovery restore-zsh
+    else
+        echo "⚠️  secure-recovery not found. Emergency restore:"
+        echo "   /bin/bash --norc"
+    fi
+}
+
+# Security check alias
+alias security-status='security-check'
+alias shell-audit='security-check'
+
+# End of Shell-Lock configuration

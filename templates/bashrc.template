@@ -1,0 +1,96 @@
+# 🔐 Shell-Lock Secure Bash Configuration Template
+# This template provides a hardened bash configuration with security monitoring
+
+# =============================================================================
+# SECURITY HEADER - DO NOT MODIFY
+# =============================================================================
+
+# Security startup integration - REQUIRED for shell-lock protection
+if [[ "$-" == *i* ]] && [[ -f "$HOME/.local/bin/dev-startup" ]]; then
+    # Interactive shell detected - run security startup
+    source "$HOME/.local/bin/dev-startup" || {
+        echo "⚠️  Security startup failed - emergency shell mode"
+        # Emergency recovery function
+        emergency_shell() {
+            echo "🚨 Starting emergency shell with clean environment"
+            /usr/bin/env -i \
+                HOME="$HOME" \
+                USER="$USER" \
+                PATH="/usr/local/bin:/usr/bin:/bin" \
+                TERM="$TERM" \
+                /bin/bash --norc --noprofile
+        }
+        
+        # Offer emergency shell option
+        echo "Type 'emergency_shell' for clean environment or 'exit' to quit"
+    }
+fi
+
+# Security monitoring integration
+if [[ -f "$HOME/.local/bin/security-check" ]]; then
+    # Run security check in background (non-blocking)
+    nohup "$HOME/.local/bin/security-check" >/dev/null 2>&1 &
+fi
+
+# =============================================================================
+# USER CONFIGURATION AREA
+# =============================================================================
+# Place your custom bash configuration below this line
+
+# Example: Basic aliases
+# alias ll='ls -alF'
+# alias la='ls -A'
+# alias l='ls -CF'
+# alias grep='grep --color=auto'
+
+# Example: Development environment variables
+# export EDITOR=vim
+# export BROWSER=firefox
+
+# Example: Language and locale
+# export LANG=en_US.UTF-8
+# export LC_ALL=en_US.UTF-8
+
+# Example: History configuration
+export HISTCONTROL=ignoreboth
+export HISTSIZE=1000
+export HISTFILESIZE=2000
+shopt -s histappend
+shopt -s checkwinsize
+
+# Example: Enable programmable completion
+if ! shopt -oq posix; then
+  if [ -f /usr/share/bash-completion/bash_completion ]; then
+    . /usr/share/bash-completion/bash_completion
+  elif [ -f /etc/bash_completion ]; then
+    . /etc/bash_completion
+  fi
+fi
+
+# Example: Prompt customization
+# PS1='\u@\h:\w\$ '
+
+# =============================================================================
+# SECURITY FOOTER - DO NOT MODIFY
+# =============================================================================
+
+# SSH agent setup (if available)
+if [[ -f "$HOME/.local/bin/ssh-agent-setup" ]]; then
+    source "$HOME/.local/bin/ssh-agent-setup"
+fi
+
+# Secure shell functions
+restore-bashrc() {
+    if command -v secure-recovery >/dev/null 2>&1; then
+        secure-recovery restore-bash
+    else
+        echo "⚠️  secure-recovery not found. Emergency restore:"
+        echo "   /bin/bash --norc"
+    fi
+}
+
+# Security check alias
+alias security-status='security-check'
+alias shell-audit='security-check'
+
+# End of Shell-Lock configuration

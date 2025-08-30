@@ -1,0 +1,356 @@
+#!/bin/bash
+# Fix shell startup ANSI pattern matching issue
+# This script patches shell configuration files to prevent the "bad pattern: ^[[0" error
+
+# Colors for output
+RED=$'\033[0;31m'
+GREEN=$'\033[0;32m'
+YELLOW=$'\033[1;33m'
+BLUE=$'\033[0;34m'
+NC=$'\033[0m' # No Color
+
+# Backup suffix with timestamp
+BACKUP_SUFFIX=".backup.$(date +%Y%m%d_%H%M%S)"
+
+# Log file
+LOG_FILE="$HOME/.local/share/shell-startup-fix.log"
+mkdir -p "$(dirname "$LOG_FILE")"
+
+log() {
+    echo "[$(date)] $*" >> "$LOG_FILE"
+    echo -e "$*"
+}
+
+# Function to backup a file
+backup_file() {
+    local file="$1"
+    if [[ -f "$file" ]]; then
+        cp "$file" "${file}${BACKUP_SUFFIX}"
+        log "${GREEN}✅ Backed up: $file -> ${file}${BACKUP_SUFFIX}${NC}"
+        return 0
+    else
+        log "${YELLOW}⚠️  File not found: $file${NC}"
+        return 1
+    fi
+}
+
+# Function to patch a file
+patch_file() {
+    local file="$1"
+    local shell_type="$2"
+    
+    if [[ ! -f "$file" ]]; then
+        log "${YELLOW}⚠️  Skipping $file (not found)${NC}"
+        return 0
+    fi
+    
+    # Check if file has already been patched (idempotent check)
+    if grep -q "# Disable globbing temporarily to prevent ANSI pattern issues" "$file"; then
+        log "${GREEN}✅ $file already patched, skipping${NC}"
+        return 0
+    fi
+    
+    # Check if file contains the problematic pattern
+    if ! grep -q "source <(.*dev-startup)" "$file"; then
+        log "${BLUE}ℹ️  No dev-startup process substitution found in $file${NC}"
+        return 0
+    fi
+    
+    log "${BLUE}🔧 Patching $file...${NC}"
+    
+    # Create temporary file
+    local temp_file=$(mktemp)
+    
+    # Apply the patch based on shell type
+    if [[ "$shell_type" == "zsh" ]]; then
+        # For zsh files
+        sed 's|source <(\(.*dev-startup.*\))|# Disable globbing temporarily to prevent ANSI pattern issues\
+        setopt noglob 2>/dev/null \|\| true\
+        source "\1"\
+        # Re-enable globbing\
+        unsetopt noglob 2>/dev/null \|\| true|g' "$file" > "$temp_file"
+    else
+        # For bash files
+        sed 's|source <(\(.*dev-startup.*\))|# Disable globbing temporarily to prevent ANSI pattern issues\
+        set +f 2>/dev/null \|\| true\
+        source "\1"\
+        # Re-enable globbing\
+        set -f 2>/dev/null \|\| true|g' "$file" > "$temp_file"
+    fi
+    
+    # Check if the patch was successful
+    if [[ $? -eq 0 ]] && [[ -s "$temp_file" ]]; then
+        # Verify the patch worked
+        if grep -q "setopt noglob\|set +f" "$temp_file"; then
+            mv "$temp_file" "$file"
+            log "${GREEN}✅ Successfully patched $file${NC}"
+            return 0
+        else
+            log "${RED}❌ Patch verification failed for $file${NC}"
+            rm -f "$temp_file"
+            return 1
+        fi
+    else
+        log "${RED}❌ Failed to patch $file${NC}"
+        rm -f "$temp_file"
+        return 1
+    fi
+}
+
+# Function to fix process substitution pattern
+fix_process_substitution() {
+    local file="$1"
+    local shell_type="$2"
+    
+    if [[ ! -f "$file" ]]; then
+        return 0
+    fi
+    
+    # Check if already patched (idempotent check)
+    if grep -q "# Disable globbing temporarily to prevent ANSI pattern issues" "$file"; then
+        return 0  # Already patched
+    fi
+    
+    # Check if the specific pattern exists
+    if ! grep -q "source <(~/.local/bin/dev-startup)" "$file"; then
+        return 0  # Pattern not found, nothing to fix
+    fi
+    
+    # Also fix the more direct approach - replace process substitution with direct sourcing
+    local temp_file=$(mktemp)
+    
+    if [[ "$shell_type" == "zsh" ]]; then
+        sed 's|source <(~/.local/bin/dev-startup)|# Disable globbing temporarily to prevent ANSI pattern issues\
+        setopt noglob 2>/dev/null \|\| true\
+        source "$HOME/.local/bin/dev-startup"\
+        # Re-enable globbing\
+        unsetopt noglob 2>/dev/null \|\| true|g' "$file" > "$temp_file"
+    else
+        sed 's|source <(~/.local/bin/dev-startup)|# Disable globbing temporarily to prevent ANSI pattern issues\
+        set +f 2>/dev/null \|\| true\
+        source "$HOME/.local/bin/dev-startup"\
+        # Re-enable globbing\
+        set -f 2>/dev/null \|\| true|g' "$file" > "$temp_file"
+    fi
+    
+    if [[ $? -eq 0 ]] && [[ -s "$temp_file" ]]; then
+        mv "$temp_file" "$file"
+        return 0
+    else
+        rm -f "$temp_file"
+        return 1
+    fi
+}
+
+# Function to check if any files need patching
+needs_patching() {
+    local files_to_check=(
+        "$HOME/.zshrc"
+        "$HOME/.bashrc"
+        "$HOME/.zshenv"
+        "$HOME/.zprofile"
+        "$HOME/.bash_profile"
+        "$HOME/.profile"
+    )
+    
+    for file in "${files_to_check[@]}"; do
+        if [[ -f "$file" ]]; then
+            # Check if file has problematic pattern and hasn't been patched
+            if grep -q "source <(.*dev-startup)" "$file" && ! grep -q "# Disable globbing temporarily to prevent ANSI pattern issues" "$file"; then
+                return 0  # Needs patching
+            fi
+        fi
+    done
+    
+    return 1  # No patching needed
+}
+
+# Main function
+main() {
+    log "${GREEN}🔧 Shell Startup Fix Script${NC}"
+    log "=================================="
+    log "${BLUE}Fixing ANSI escape sequence pattern matching issue${NC}"
+    log ""
+    
+    # Check if any files actually need patching (idempotent check)
+    if ! needs_patching; then
+        log "${GREEN}✅ All files are already patched or don't need patching!${NC}"
+        log "${BLUE}ℹ️  This script is idempotent - safe to run multiple times${NC}"
+        return 0
+    fi
+    
+    # List of files to patch
+    local files_to_patch=(
+        "$HOME/.zshrc:zsh"
+        "$HOME/.bashrc:bash"
+        "$HOME/.zshenv:zsh"
+        "$HOME/.zprofile:zsh"
+        "$HOME/.bash_profile:bash"
+        "$HOME/.profile:bash"
+    )
+    
+    local patched_count=0
+    local error_count=0
+    
+    # Process each file
+    for file_spec in "${files_to_patch[@]}"; do
+        IFS=':' read -r file shell_type <<< "$file_spec"
+        
+        if [[ -f "$file" ]]; then
+            log "${BLUE}📁 Processing: $file${NC}"
+            
+            # Create backup
+            if backup_file "$file"; then
+                # Apply patch
+                if patch_file "$file" "$shell_type" && fix_process_substitution "$file" "$shell_type"; then
+                    ((patched_count++))
+                    log "${GREEN}✅ Successfully fixed: $file${NC}"
+                else
+                    ((error_count++))
+                    log "${RED}❌ Failed to fix: $file${NC}"
+                    # Restore from backup on failure
+                    if [[ -f "${file}${BACKUP_SUFFIX}" ]]; then
+                        cp "${file}${BACKUP_SUFFIX}" "$file"
+                        log "${YELLOW}🔄 Restored from backup: $file${NC}"
+                    fi
+                fi
+            else
+                ((error_count++))
+            fi
+            log ""
+        fi
+    done
+    
+    # Summary
+    log "${GREEN}📊 Summary:${NC}"
+    log "  Patched files: $patched_count"
+    log "  Errors: $error_count"
+    log "  Backups created with suffix: $BACKUP_SUFFIX"
+    log "  Log file: $LOG_FILE"
+    log ""
+    
+    if [[ $patched_count -gt 0 ]]; then
+        log "${GREEN}🎉 Patch completed successfully!${NC}"
+        log "${YELLOW}⚡ Please start a new shell session to test the fix${NC}"
+        log ""
+        log "${BLUE}💡 To verify the fix worked:${NC}"
+        log "   1. Open a new terminal"
+        log "   2. Check for absence of 'bad pattern: ^[[0' errors"
+        log ""
+        log "${BLUE}🔄 To restore if needed:${NC}"
+        log "   cp ~/.zshrc$BACKUP_SUFFIX ~/.zshrc"
+        log "   cp ~/.bashrc$BACKUP_SUFFIX ~/.bashrc"
+        log "   (etc. for other backed up files)"
+    else
+        log "${YELLOW}ℹ️  No files needed patching or all patches failed${NC}"
+    fi
+    
+    return $error_count
+}
+
+# Help function
+show_help() {
+    echo "Shell Startup Fix Script"
+    echo ""
+    echo "USAGE:"
+    echo "  $0                    # Apply patches (idempotent)"
+    echo "  $0 --help           # Show this help"
+    echo "  $0 --status         # Check patch status"
+    echo "  $0 --dry-run        # Show what would be patched (not implemented)"
+    echo ""
+    echo "DESCRIPTION:"
+    echo "  Fixes the 'bad pattern: ^[[0' error by modifying shell configuration"
+    echo "  files to disable globbing when sourcing dev-startup script."
+    echo "  This script is idempotent - safe to run multiple times."
+    echo ""
+    echo "FILES PROCESSED:"
+    echo "  - ~/.zshrc"
+    echo "  - ~/.bashrc" 
+    echo "  - ~/.zshenv"
+    echo "  - ~/.zprofile"
+    echo "  - ~/.bash_profile"
+    echo "  - ~/.profile"
+    echo ""
+    echo "SAFETY:"
+    echo "  - Creates timestamped backups before modifying files"
+    echo "  - Restores from backup if patch fails"
+    echo "  - Logs all operations to ~/.local/share/shell-startup-fix.log"
+}
+
+# Function to show status
+show_status() {
+    echo "Shell Configuration Patch Status"
+    echo "================================="
+    echo ""
+    
+    local files_to_check=(
+        "$HOME/.zshrc"
+        "$HOME/.bashrc"
+        "$HOME/.zshenv"
+        "$HOME/.zprofile"
+        "$HOME/.bash_profile"
+        "$HOME/.profile"
+    )
+    
+    local needs_patch=0
+    local already_patched=0
+    local not_found=0
+    
+    for file in "${files_to_check[@]}"; do
+        if [[ -f "$file" ]]; then
+            if grep -q "source <(.*dev-startup)" "$file"; then
+                if grep -q "# Disable globbing temporarily to prevent ANSI pattern issues" "$file"; then
+                    echo "✅ $file - Already patched"
+                    ((already_patched++))
+                else
+                    echo "⚠️  $file - Needs patching"
+                    ((needs_patch++))
+                fi
+            else
+                echo "ℹ️  $file - No dev-startup pattern found"
+            fi
+        else
+            echo "❌ $file - Not found"
+            ((not_found++))
+        fi
+    done
+    
+    echo ""
+    echo "Summary:"
+    echo "  Already patched: $already_patched"
+    echo "  Needs patching: $needs_patch" 
+    echo "  Not found: $not_found"
+    echo ""
+    
+    if [[ $needs_patch -gt 0 ]]; then
+        echo "Run '$0' to apply patches"
+        return 1
+    else
+        echo "All files are properly configured!"
+        return 0
+    fi
+}
+
+# Parse arguments
+case "${1:-}" in
+    --help|-h)
+        show_help
+        exit 0
+        ;;
+    --status|-s)
+        show_status
+        exit $?
+        ;;
+    --dry-run)
+        echo "Dry-run mode not yet implemented"
+        exit 1
+        ;;
+    "")
+        main
+        ;;
+    *)
+        echo "Unknown option: $1"
+        echo "Use --help for usage information"
+        exit 1
+        ;;
+esac

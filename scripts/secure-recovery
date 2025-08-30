@@ -1,0 +1,215 @@
+#!/bin/bash
+# Secure Recovery System - Tamper-resistant recovery mechanisms
+# Created: 2025-08-30
+
+set -euo pipefail
+
+readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+readonly BACKUP_DIR="$HOME/.local/share/secure-backups"
+readonly CHECKSUMS_FILE="$BACKUP_DIR/checksums.txt"
+readonly RECOVERY_LOG="$HOME/.local/share/recovery.log"
+
+# Secure logging
+log_recovery() {
+    echo "$(date '+%Y-%m-%d %H:%M:%S') [RECOVERY] $*" | tee -a "$RECOVERY_LOG"
+}
+
+# Verify file integrity using checksums
+verify_backup_integrity() {
+    local file="$1"
+    local expected_checksum="$2"
+    
+    if [[ ! -f "$file" ]]; then
+        log_recovery "ERROR: Backup file $file not found"
+        return 1
+    fi
+    
+    local actual_checksum
+    actual_checksum=$(sha256sum "$file" | cut -d' ' -f1)
+    
+    if [[ "$actual_checksum" != "$expected_checksum" ]]; then
+        log_recovery "ERROR: Backup file $file integrity check failed"
+        log_recovery "Expected: $expected_checksum"
+        log_recovery "Actual:   $actual_checksum"
+        return 1
+    fi
+    
+    log_recovery "INFO: Backup file $file integrity verified"
+    return 0
+}
+
+# Create secure backup with integrity protection
+create_secure_backup() {
+    local source_file="$1"
+    local backup_name="$2"
+    
+    if [[ ! -f "$source_file" ]]; then
+        log_recovery "WARNING: Source file $source_file does not exist"
+        return 1
+    fi
+    
+    # Create backup directory with secure permissions
+    mkdir -p "$BACKUP_DIR"
+    chmod 700 "$BACKUP_DIR"
+    
+    local timestamp
+    timestamp=$(date '+%Y%m%d_%H%M%S')
+    local backup_file="$BACKUP_DIR/${backup_name}.${timestamp}"
+    
+    # Copy file with verification
+    cp "$source_file" "$backup_file"
+    chmod 600 "$backup_file"  # Only owner can read/write
+    
+    # Generate and store checksum
+    local checksum
+    checksum=$(sha256sum "$backup_file" | cut -d' ' -f1)
+    echo "$checksum  $backup_file" >> "$CHECKSUMS_FILE"
+    chmod 600 "$CHECKSUMS_FILE"
+    
+    log_recovery "INFO: Created secure backup: $backup_file"
+    log_recovery "INFO: Checksum: $checksum"
+}
+
+# Restore from secure backup with verification
+restore_secure_backup() {
+    local backup_pattern="$1"
+    local target_file="$2"
+    
+    # Find most recent backup
+    local latest_backup
+    latest_backup=$(find "$BACKUP_DIR" -name "$backup_pattern.*" -type f | sort | tail -1)
+    
+    if [[ -z "$latest_backup" ]]; then
+        log_recovery "ERROR: No backup found matching pattern: $backup_pattern"
+        return 1
+    fi
+    
+    # Get expected checksum
+    local expected_checksum
+    expected_checksum=$(grep "$latest_backup" "$CHECKSUMS_FILE" | cut -d' ' -f1)
+    
+    if [[ -z "$expected_checksum" ]]; then
+        log_recovery "ERROR: No checksum found for backup: $latest_backup"
+        return 1
+    fi
+    
+    # Verify backup integrity
+    if ! verify_backup_integrity "$latest_backup" "$expected_checksum"; then
+        log_recovery "ERROR: Backup integrity verification failed"
+        return 1
+    fi
+    
+    # Create backup of current file before restoration
+    if [[ -f "$target_file" ]]; then
+        create_secure_backup "$target_file" "pre-restore-$(basename "$target_file")"
+    fi
+    
+    # Restore with verification
+    cp "$latest_backup" "$target_file"
+    
+    # Verify restoration
+    local restored_checksum
+    restored_checksum=$(sha256sum "$target_file" | cut -d' ' -f1)
+    
+    if [[ "$restored_checksum" != "$expected_checksum" ]]; then
+        log_recovery "ERROR: Restoration verification failed"
+        return 1
+    fi
+    
+    log_recovery "INFO: Successfully restored $target_file from $latest_backup"
+    return 0
+}
+
+# Emergency shell with limited environment
+emergency_shell() {
+    log_recovery "INFO: Starting emergency shell"
+    
+    # Use absolute paths to avoid PATH manipulation
+    /usr/bin/env -i \
+        HOME="$HOME" \
+        USER="$USER" \
+        PATH="/usr/local/bin:/usr/bin:/bin" \
+        TERM="$TERM" \
+        /bin/bash --norc --noprofile
+        
+    log_recovery "INFO: Emergency shell exited"
+}
+
+# Secure recovery functions
+case "${1:-help}" in
+    "backup-zsh")
+        create_secure_backup "$HOME/.zshrc" "zshrc"
+        ;;
+    "backup-bash")
+        create_secure_backup "$HOME/.bashrc" "bashrc"
+        ;;
+    "backup-profile")
+        create_secure_backup "$HOME/.profile" "profile"
+        ;;
+    "backup-all")
+        create_secure_backup "$HOME/.zshrc" "zshrc"
+        create_secure_backup "$HOME/.bashrc" "bashrc"
+        [[ -f "$HOME/.profile" ]] && create_secure_backup "$HOME/.profile" "profile"
+        ;;
+    "restore-zsh")
+        restore_secure_backup "zshrc" "$HOME/.zshrc"
+        ;;
+    "restore-bash")
+        restore_secure_backup "bashrc" "$HOME/.bashrc"
+        ;;
+    "restore-profile")
+        restore_secure_backup "profile" "$HOME/.profile"
+        ;;
+    "emergency")
+        emergency_shell
+        ;;
+    "verify")
+        if [[ -f "$CHECKSUMS_FILE" ]]; then
+            cd "$BACKUP_DIR"
+            sha256sum -c "$CHECKSUMS_FILE"
+        else
+            echo "No checksums file found"
+            exit 1
+        fi
+        ;;
+    "list")
+        echo "Available secure backups:"
+        if [[ -d "$BACKUP_DIR" ]]; then
+            ls -la "$BACKUP_DIR"
+        else
+            echo "No backup directory found"
+        fi
+        ;;
+    "help"|*)
+        cat << 'HELP_EOF'
+Secure Recovery System
+
+Usage: secure-recovery <command>
+
+Commands:
+  backup-zsh      Create secure backup of ~/.zshrc
+  backup-bash     Create secure backup of ~/.bashrc  
+  backup-profile  Create secure backup of ~/.profile
+  backup-all      Create secure backups of all shell configs
+  
+  restore-zsh     Restore ~/.zshrc from most recent secure backup
+  restore-bash    Restore ~/.bashrc from most recent secure backup
+  restore-profile Restore ~/.profile from most recent secure backup
+  
+  emergency       Start emergency shell with clean environment
+  verify          Verify integrity of all backups
+  list            List available secure backups
+  
+  help            Show this help message
+
+Features:
+- Cryptographic integrity verification (SHA-256)
+- Secure file permissions (600/700)
+- Tamper detection and logging
+- Clean emergency shell environment
+- Automatic pre-restoration backups
+
+Log file: ~/.local/share/recovery.log
+HELP_EOF
+        ;;
+esac

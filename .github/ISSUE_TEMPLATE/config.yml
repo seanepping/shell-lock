@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 🔒 Security Policy
+    url: https://github.com/seanepping/shell-lock/blob/main/SECURITY.md
+    about: Review our security policy for responsible disclosure guidelines
+  - name: 📚 Documentation
+    url: https://github.com/seanepping/shell-lock/blob/main/docs/
+    about: Check our comprehensive documentation for usage guides and troubleshooting
+  - name: 💬 Discussions
+    url: https://github.com/seanepping/shell-lock/discussions
+    about: Ask questions, share tips, or discuss Shell-Lock with the community

@@ -1,0 +1,67 @@
+# 🔐 Shell-Lock Secure SSH Configuration Template
+# This template provides hardened SSH client configuration
+
+# Global SSH client security settings
+Host *
+    # Security hardening
+    Protocol 2
+    ForwardAgent no
+    ForwardX11 no
+    ForwardX11Trusted no
+    
+    # Encryption settings
+    Ciphers chacha20-poly1305@openssh.com,aes256-gcm@openssh.com,aes128-gcm@openssh.com,aes256-ctr,aes192-ctr,aes128-ctr
+    MACs hmac-sha2-256-etm@openssh.com,hmac-sha2-512-etm@openssh.com,hmac-sha2-256,hmac-sha2-512
+    KexAlgorithms curve25519-sha256@libssh.org,diffie-hellman-group16-sha512,diffie-hellman-group18-sha512
+    
+    # Authentication settings
+    PubkeyAuthentication yes
+    PasswordAuthentication no
+    ChallengeResponseAuthentication no
+    GSSAPIAuthentication no
+    
+    # Connection settings
+    ServerAliveInterval 60
+    ServerAliveCountMax 3
+    TCPKeepAlive yes
+    
+    # Disable insecure features
+    CheckHostIP yes
+    StrictHostKeyChecking ask
+    VerifyHostKeyDNS yes
+    
+    # Use secure key types only
+    PubkeyAcceptedKeyTypes ssh-ed25519,rsa-sha2-512,rsa-sha2-256
+
+# GitHub configuration (using Ed25519 key)
+Host github.com
+    HostName github.com
+    User git
+    IdentityFile ~/.ssh/github_ed25519
+    IdentitiesOnly yes
+    AddKeysToAgent yes
+    UseKeychain yes
+
+# Example: Additional Git hosting services
+# Host gitlab.com
+#     HostName gitlab.com
+#     User git
+#     IdentityFile ~/.ssh/gitlab_ed25519
+#     IdentitiesOnly yes
+
+# Host bitbucket.org
+#     HostName bitbucket.org
+#     User git
+#     IdentityFile ~/.ssh/bitbucket_ed25519
+#     IdentitiesOnly yes
+
+# Example: Server configurations
+# Host myserver
+#     HostName example.com
+#     User username
+#     Port 22
+#     IdentityFile ~/.ssh/server_ed25519
+#     IdentitiesOnly yes
+
+# Security note: Always use Ed25519 keys with passphrases
+# Generate with: ssh-keygen -t ed25519 -C "your_email@example.com"

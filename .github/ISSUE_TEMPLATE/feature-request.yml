@@ -1,0 +1,117 @@
+name: ✨ Feature Request
+description: Suggest a new feature or enhancement for Shell-Lock
+title: "[FEATURE] "
+labels: ["enhancement", "feature-request"]
+assignees: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## Feature Request
+        
+        We'd love to hear your ideas for improving Shell-Lock! Please provide as much detail as possible.
+
+  - type: dropdown
+    id: feature-type
+    attributes:
+      label: Feature Type
+      description: What type of feature are you requesting?
+      options:
+        - New security hardening capability
+        - Enhanced credential management
+        - Improved shell integration
+        - Better backup/recovery features
+        - Additional platform support
+        - Documentation improvement
+        - Performance enhancement
+        - Developer experience improvement
+        - Integration with external tools
+        - Other (specify below)
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem-statement
+    attributes:
+      label: Problem Statement
+      description: What problem does this feature solve?
+      placeholder: |
+        Describe the current limitation or gap that this feature would address:
+        - What security concern does it address?
+        - What workflow would it improve?
+        - What pain point would it solve?
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposed-solution
+    attributes:
+      label: Proposed Solution
+      description: Describe your ideal solution
+      placeholder: |
+        Describe what you'd like to see implemented:
+        - How should it work?
+        - What should the user experience be?
+        - How should it integrate with existing features?
+    validations:
+      required: true
+
+  - type: textarea
+    id: security-considerations
+    attributes:
+      label: Security Considerations
+      description: How does this feature impact security?
+      placeholder: |
+        Consider the security implications:
+        - Does this introduce new attack vectors?
+        - How does it enhance security?
+        - What are the privacy implications?
+        - Are there any trust considerations?
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternative Solutions
+      description: Describe any alternative solutions you've considered
+      placeholder: |
+        What other approaches could solve this problem?
+        - Other tools or methods you've tried
+        - Workarounds that exist but are insufficient
+        - Why this approach is preferable
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priority Level
+      description: How important is this feature to you?
+      options:
+        - High - This is blocking critical security workflows
+        - Medium - This would significantly improve usability
+        - Low - This would be a nice enhancement
+        - Wishlist - This would be cool to have someday
+    validations:
+      required: true
+
+  - type: textarea
+    id: use-case
+    attributes:
+      label: Use Case Examples
+      description: Provide specific examples of how this feature would be used
+      placeholder: |
+        Describe concrete scenarios:
+        - Who would use this feature?
+        - In what situations?
+        - What would the typical workflow look like?
+
+  - type: checkboxes
+    id: implementation-help
+    attributes:
+      label: Implementation
+      description: Would you be interested in helping implement this feature?
+      options:
+        - label: I would be willing to submit a pull request
+        - label: I can help with testing and feedback
+        - label: I can provide documentation or examples
+        - label: I prefer to just request the feature

@@ -1,0 +1,97 @@
+name: 🐛 Bug Report
+description: Report a bug or unexpected behavior in Shell-Lock
+title: "[BUG] "
+labels: ["bug", "needs-triage"]
+assignees: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## Bug Report
+        
+        Thank you for reporting a bug! This helps us improve Shell-Lock's reliability and security.
+        
+        **Security Note**: If this bug has security implications, please use the Security Vulnerability template instead.
+
+  - type: dropdown
+    id: component
+    attributes:
+      label: Affected Component
+      description: Which part of Shell-Lock is experiencing the issue?
+      options:
+        - Installation (install.sh)
+        - Credential management (secure-cred, gh-secure)
+        - Shell startup (dev-startup)
+        - Security checks (security-check)
+        - Backup/recovery (secure-recovery)
+        - Integrity monitoring
+        - SSH configuration
+        - GPG integration
+        - Documentation
+        - Other (specify below)
+    validations:
+      required: true
+
+  - type: textarea
+    id: bug-description
+    attributes:
+      label: Bug Description
+      description: A clear and concise description of what the bug is
+      placeholder: Describe what happened and what you expected to happen
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction-steps
+    attributes:
+      label: Steps to Reproduce
+      description: Steps to reproduce the behavior
+      placeholder: |
+        1. Run command '...'
+        2. See error '...'
+        3. Expected behavior was '...'
+    validations:
+      required: true
+
+  - type: textarea
+    id: error-output
+    attributes:
+      label: Error Output
+      description: If applicable, paste any error messages or logs
+      render: shell
+      placeholder: Paste error messages or command output here
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Please provide details about your environment
+      placeholder: |
+        - OS: (e.g., Ubuntu 22.04, WSL2, macOS 13.0)
+        - Shell: (e.g., zsh 5.8, bash 5.1)
+        - Shell-Lock version: 
+        - Terminal: (e.g., Windows Terminal, iTerm2, GNOME Terminal)
+        - GPG version: (run `gpg --version`)
+        - GitHub CLI version: (run `gh --version`)
+    validations:
+      required: true
+
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: Additional Context
+      description: Add any other context about the problem here
+      placeholder: Any additional information that might help us understand the issue
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Pre-submission Checklist
+      description: Please verify the following before submitting
+      options:
+        - label: I have searched existing issues to ensure this is not a duplicate
+          required: true
+        - label: I have provided sufficient information to reproduce the issue
+          required: true
+        - label: This is not a security vulnerability (if it is, I'll use the security template)
+          required: true

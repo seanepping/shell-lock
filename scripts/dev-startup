@@ -1,0 +1,165 @@
+#!/bin/bash
+# Development environment startup script with security and authentication
+
+# Colors for output (with explicit escaping to prevent pattern interpretation)
+RED=$'\033[0;31m'
+GREEN=$'\033[0;32m'
+YELLOW=$'\033[1;33m'
+BLUE=$'\033[0;34m'
+NC=$'\033[0m' # No Color
+
+# Disable globbing for ANSI sequences to prevent pattern matching errors
+set -o noglob 2>/dev/null || true
+
+# Emergency recovery function
+emergency_recovery() {
+    echo -e "${RED}🚨 EMERGENCY RECOVERY MODE${NC}"
+    echo "Available recovery options:"
+    echo "1. Restore zshrc backup: restore-zshrc"
+    echo "2. Emergency shell: /bin/bash --norc"
+    echo "3. Check security log: cat ~/.local/share/security-check.log"
+    echo "4. List backups: ls -la ~/.zshrc.backup.*"
+    
+    # Create recovery alias
+    alias restore-zshrc='latest=$(ls -t ~/.zshrc.backup.* 2>/dev/null | head -1); if [ -n "$latest" ]; then cp "$latest" ~/.zshrc && echo "Restored from $latest"; else echo "No backup found"; fi'
+}
+
+# Security check (ALWAYS runs)
+run_security_check() {
+    echo -e "${BLUE}🛡️  Running mandatory security checks...${NC}"
+    
+    if ! ~/.local/bin/security-check; then
+        echo -e "${RED}🚨 SECURITY CHECK FAILED!${NC}"
+        emergency_recovery
+        return 1
+    fi
+    
+    return 0
+}
+
+# Timed authentication prompt
+prompt_authentication() {
+    echo -e "${YELLOW}🔐 Authentication Setup${NC}"
+    echo "Do you want to authenticate for this session? (y/N)"
+    echo "Will auto-skip in 5 seconds if no response..."
+    
+    # Read with timeout
+    if read -t 5 -r response; then
+        # Convert to lowercase using tr (portable across shells)
+        response_lower=$(echo "$response" | tr '[:upper:]' '[:lower:]')
+        case "$response_lower" in
+            y|yes)
+                return 0  # Authenticate
+                ;;
+            *)
+                echo -e "${YELLOW}⏭️  Skipping authentication${NC}"
+                return 1  # Skip
+                ;;
+        esac
+    else
+        echo -e "${YELLOW}⏱️  Timeout - skipping authentication${NC}"
+        return 1  # Skip due to timeout
+    fi
+}
+
+# SSH agent setup
+setup_ssh_agent() {
+    echo -e "${BLUE}🔑 Setting up SSH agent...${NC}"
+    
+    # Check if SSH agent is already running
+    if [ -f ~/.ssh/agent-environment ]; then
+        source ~/.ssh/agent-environment > /dev/null
+        if ps -p "$SSH_AGENT_PID" > /dev/null 2>&1; then
+            echo -e "${GREEN}✅ SSH agent already running${NC}"
+        else
+            echo -e "${YELLOW}🔄 Restarting SSH agent...${NC}"
+            ~/.local/bin/ssh-agent-setup
+        fi
+    else
+        echo -e "${YELLOW}🆕 Starting new SSH agent...${NC}"
+        ~/.local/bin/ssh-agent-setup
+    fi
+    
+    # Test SSH connection
+    echo -e "${BLUE}🧪 Testing GitHub SSH connection...${NC}"
+    if ssh -T git@github.com 2>&1 | grep -q "successfully authenticated"; then
+        echo -e "${GREEN}✅ GitHub SSH authentication successful${NC}"
+    else
+        echo -e "${RED}❌ GitHub SSH authentication failed${NC}"
+        echo -e "${YELLOW}💡 To set up GitHub SSH authentication:${NC}"
+        echo -e "${YELLOW}   1. Generate SSH key: ssh-keygen -t ed25519 -C 'your_email@example.com'${NC}"
+        echo -e "${YELLOW}   2. Add to GitHub: gh ssh-key add ~/.ssh/id_ed25519.pub${NC}"
+        echo -e "${YELLOW}   3. Test: ssh -T git@github.com${NC}"
+        return 1
+    fi
+}
+
+# Development environment setup
+setup_dev_environment() {
+    echo -e "${BLUE}🚀 Setting up development environment...${NC}"
+    
+    # Add local bin to PATH if not already there
+    if [[ ":$PATH:" != *":$HOME/.local/bin:"* ]]; then
+        export PATH="$HOME/.local/bin:$PATH"
+        echo -e "${GREEN}✅ Added ~/.local/bin to PATH${NC}"
+    fi
+    
+    # Set up useful aliases
+    alias ll='ls -alF'
+    alias la='ls -A'
+    alias l='ls -CF'
+    alias gh-secure='~/.local/bin/gh-secure'
+    alias security-check='~/.local/bin/security-check'
+    alias rotate-key='~/.local/bin/rotate-github-key'
+    
+    echo -e "${GREEN}✅ Development aliases configured${NC}"
+    
+    # Show available security tools
+    echo -e "${BLUE}🔧 Available security tools:${NC}"
+    echo "  - security-check: Run security verification"
+    echo "  - gh-secure: Secure GitHub CLI wrapper"
+    echo "  - rotate-key: Rotate SSH keys"
+    echo "  - secure-cred: Encrypted credential storage"
+}
+
+# Main startup function
+main() {
+    echo -e "${GREEN}🌟 Development Environment Startup${NC}"
+    echo "=================================="
+    
+    # ALWAYS run security check first
+    if ! run_security_check; then
+        echo -e "${RED}❌ Startup aborted due to security issues${NC}"
+        emergency_recovery
+        return 1
+    fi
+    
+    # Prompt for authentication
+    if prompt_authentication; then
+        echo -e "${GREEN}🔓 Proceeding with authentication...${NC}"
+        
+        if ! setup_ssh_agent; then
+            echo -e "${YELLOW}⚠️  SSH setup failed, continuing without authentication${NC}"
+        fi
+    else
+        echo -e "${YELLOW}🔒 Proceeding without authentication${NC}"
+    fi
+    
+    # Always set up development environment
+    setup_dev_environment
+    
+    echo -e "${GREEN}�� Development environment ready!${NC}"
+    echo ""
+}
+
+# Emergency mode check
+if [ "$1" = "--emergency" ]; then
+    emergency_recovery
+    exit 0
+fi
+
+# Run main startup
+main "$@"
+
+# Re-enable globbing
+set +o noglob 2>/dev/null || true

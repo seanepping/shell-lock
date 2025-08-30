@@ -1,0 +1,267 @@
+#!/bin/bash
+# Secure GitHub CLI wrapper using encrypted credential storage
+# Uses the secure-cred system for token management
+
+set -euo pipefail
+
+readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+readonly SECURE_CRED="$SCRIPT_DIR/secure-cred"
+readonly LOG_FILE="$HOME/.local/share/gh-secure.log"
+
+# Secure logging
+log_gh() {
+    echo "$(date '+%Y-%m-%d %H:%M:%S') [GH-SECURE] $*" | tee -a "$LOG_FILE"
+}
+
+# Colors for output
+RED=$'\033[0;31m'
+GREEN=$'\033[0;32m'
+YELLOW=$'\033[1;33m'
+BLUE=$'\033[0;34m'
+NC=$'\033[0m' # No Color
+
+# Check if secure-cred is available
+check_secure_cred() {
+    if [[ ! -x "$SECURE_CRED" ]]; then
+        echo -e "${RED}❌ secure-cred not found or not executable: $SECURE_CRED${NC}" >&2
+        echo "   Please ensure the secure-cred script is installed and executable" >&2
+        exit 1
+    fi
+}
+
+# Set up GitHub CLI authentication using stored credentials
+auth_login() {
+    local username="${1:-}"
+    
+    if [[ -z "$username" ]]; then
+        echo -e "${YELLOW}💡 Available GitHub credentials:${NC}"
+        "$SECURE_CRED" list | grep "^github:" || {
+            echo -e "${YELLOW}⚠️  No GitHub credentials found${NC}"
+            echo -e "${BLUE}ℹ️  Use: gh-secure auth set <username> <token>${NC}"
+            return 1
+        }
+        echo ""
+        read -p "Enter GitHub username: " username
+    fi
+    
+    echo -e "${BLUE}🔑 Retrieving secure credentials for: $username${NC}"
+    
+    local token
+    if ! token=$("$SECURE_CRED" get github "$username" 2>/dev/null); then
+        echo -e "${RED}❌ No GitHub token found for user: $username${NC}" >&2
+        echo -e "${BLUE}ℹ️  Use: gh-secure auth set $username <token>${NC}" >&2
+        return 1
+    fi
+    
+    echo -e "${BLUE}🔐 Authenticating with GitHub CLI...${NC}"
+    
+    # Use the token to authenticate gh CLI
+    if echo "$token" | gh auth login --with-token; then
+        echo -e "${GREEN}✅ Successfully authenticated with GitHub CLI${NC}"
+        log_gh "INFO: Successful authentication for user: $username"
+        
+        # Verify authentication
+        echo -e "${BLUE}🧪 Verifying authentication...${NC}"
+        if gh auth status; then
+            echo -e "${GREEN}✅ GitHub CLI authentication verified${NC}"
+            return 0
+        else
+            echo -e "${RED}❌ Authentication verification failed${NC}" >&2
+            return 1
+        fi
+    else
+        echo -e "${RED}❌ GitHub CLI authentication failed${NC}" >&2
+        log_gh "ERROR: Authentication failed for user: $username"
+        return 1
+    fi
+}
+
+# Store GitHub credentials securely
+auth_set() {
+    local username="$1"
+    local token="$2"
+    
+    if [[ -z "$username" ]] || [[ -z "$token" ]]; then
+        echo "Usage: gh-secure auth set <username> <token>" >&2
+        return 1
+    fi
+    
+    echo -e "${BLUE}🔐 Storing GitHub credentials securely...${NC}"
+    
+    if "$SECURE_CRED" set github "$username" "$token"; then
+        echo -e "${GREEN}✅ GitHub credentials stored securely for: $username${NC}"
+        log_gh "INFO: Credentials stored for user: $username"
+        
+        echo -e "${YELLOW}💡 Now run: gh-secure auth login $username${NC}"
+        return 0
+    else
+        echo -e "${RED}❌ Failed to store credentials${NC}" >&2
+        log_gh "ERROR: Failed to store credentials for user: $username"
+        return 1
+    fi
+}
+
+# Show authentication status
+auth_status() {
+    echo -e "${BLUE}🔍 GitHub CLI Authentication Status${NC}"
+    echo "=================================="
+    
+    # Check gh CLI status
+    if gh auth status 2>/dev/null; then
+        echo ""
+        echo -e "${GREEN}✅ GitHub CLI is authenticated${NC}"
+    else
+        echo -e "${YELLOW}⚠️  GitHub CLI is not authenticated${NC}"
+        echo ""
+        echo -e "${BLUE}Available secure credentials:${NC}"
+        "$SECURE_CRED" list | grep "^github:" || {
+            echo -e "${YELLOW}⚠️  No GitHub credentials stored${NC}"
+        }
+    fi
+}
+
+# List stored GitHub credentials
+auth_list() {
+    echo -e "${BLUE}🔑 Stored GitHub Credentials${NC}"
+    echo "========================="
+    
+    "$SECURE_CRED" list | grep "^github:" || {
+        echo -e "${YELLOW}⚠️  No GitHub credentials found${NC}"
+        echo -e "${BLUE}ℹ️  Use: gh-secure auth set <username> <token>${NC}"
+    }
+}
+
+# Delete stored credentials
+auth_delete() {
+    local username="$1"
+    
+    if [[ -z "$username" ]]; then
+        echo "Usage: gh-secure auth delete <username>" >&2
+        return 1
+    fi
+    
+    echo -e "${YELLOW}⚠️  Deleting GitHub credentials for: $username${NC}"
+    read -p "Are you sure? (y/N): " confirm
+    
+    if [[ "${confirm,,}" == "y" ]]; then
+        if "$SECURE_CRED" delete github "$username"; then
+            echo -e "${GREEN}✅ Credentials deleted for: $username${NC}"
+            log_gh "INFO: Credentials deleted for user: $username"
+        else
+            echo -e "${RED}❌ Failed to delete credentials${NC}" >&2
+            return 1
+        fi
+    else
+        echo -e "${BLUE}ℹ️  Operation cancelled${NC}"
+    fi
+}
+
+# Secure GitHub CLI wrapper
+gh_secure() {
+    # Ensure we have valid authentication before running any gh commands
+    if ! gh auth status >/dev/null 2>&1; then
+        echo -e "${YELLOW}⚠️  GitHub CLI not authenticated${NC}" >&2
+        echo -e "${BLUE}ℹ️  Run: gh-secure auth login [username]${NC}" >&2
+        return 1
+    fi
+    
+    # Log the command (without sensitive args)
+    local safe_args=()
+    for arg in "$@"; do
+        # Hide potential tokens or sensitive data
+        if [[ "$arg" =~ ^(ghp_|gho_|ghu_|ghs_) ]]; then
+            safe_args+=("[TOKEN]")
+        else
+            safe_args+=("$arg")
+        fi
+    done
+    
+    log_gh "INFO: Running gh command: ${safe_args[*]}"
+    
+    # Execute the GitHub CLI command
+    gh "$@"
+}
+
+# Help function
+show_help() {
+    cat << 'HELP_EOF'
+GitHub CLI Secure Wrapper
+
+USAGE:
+  gh-secure auth <subcommand>     # Authentication management
+  gh-secure <gh-command>          # Secure GitHub CLI wrapper
+
+AUTHENTICATION COMMANDS:
+  gh-secure auth set <username> <token>    # Store GitHub token securely
+  gh-secure auth login [username]          # Login using stored credentials
+  gh-secure auth status                    # Show authentication status
+  gh-secure auth list                      # List stored GitHub usernames
+  gh-secure auth delete <username>         # Delete stored credentials
+
+EXAMPLES:
+  # Store your GitHub personal access token
+  gh-secure auth set myusername ghp_xxxxxxxxxxxxxxxxxxxx
+  
+  # Login using stored credentials
+  gh-secure auth login myusername
+  
+  # Use GitHub CLI securely (after authentication)
+  gh-secure repo create my-new-repo
+  gh-secure pr list
+  gh-secure issue create --title "Bug report"
+
+SECURITY FEATURES:
+  - Tokens encrypted with GPG
+  - Secure credential storage
+  - Authentication verification
+  - Command logging (tokens redacted)
+  - No plaintext token storage
+
+REQUIREMENTS:
+  - GitHub CLI (gh) installed
+  - GPG configured for encryption
+  - secure-cred script available
+
+Log file: ~/.local/share/gh-secure.log
+HELP_EOF
+}
+
+# Main command processing
+main() {
+    check_secure_cred
+    
+    case "${1:-help}" in
+        "auth")
+            case "${2:-help}" in
+                "set")
+                    auth_set "${3:-}" "${4:-}"
+                    ;;
+                "login")
+                    auth_login "${3:-}"
+                    ;;
+                "status")
+                    auth_status
+                    ;;
+                "list")
+                    auth_list
+                    ;;
+                "delete")
+                    auth_delete "${3:-}"
+                    ;;
+                "help"|*)
+                    echo "Authentication subcommands: set, login, status, list, delete"
+                    echo "Use 'gh-secure help' for full help"
+                    ;;
+            esac
+            ;;
+        "help"|"--help"|"-h")
+            show_help
+            ;;
+        *)
+            # Pass through to GitHub CLI with security checks
+            gh_secure "$@"
+            ;;
+    esac
+}
+
+main "$@"

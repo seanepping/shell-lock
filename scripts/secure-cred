@@ -1,0 +1,69 @@
+#!/bin/bash
+# Secure credential helper for headless systems
+# Usage: secure-cred set <service> <username> <token>
+#        secure-cred get <service> <username>
+
+CRED_DIR="$HOME/.local/share/secure-credentials"
+mkdir -p "$CRED_DIR"
+chmod 700 "$CRED_DIR"
+
+case "$1" in
+    "set")
+        if [ $# -ne 4 ]; then
+            echo "Usage: $0 set <service> <username> <token>"
+            exit 1
+        fi
+        service="$2"
+        username="$3"
+        token="$4"
+        
+        # Encrypt and store the token
+        export GPG_TTY=$(tty)
+        echo "$token" | gpg --symmetric --cipher-algo AES256 --pinentry-mode loopback --output "$CRED_DIR/${service}_${username}.gpg"
+        if [ $? -eq 0 ]; then
+            echo "Credential stored securely for $service:$username"
+        else
+            echo "Failed to store credential - GPG encryption failed" >&2
+            exit 1
+        fi
+        ;;
+    "get")
+        if [ $# -ne 3 ]; then
+            echo "Usage: $0 get <service> <username>"
+            exit 1
+        fi
+        service="$2"
+        username="$3"
+        
+        # Decrypt and return the token
+        if [ -f "$CRED_DIR/${service}_${username}.gpg" ]; then
+            export GPG_TTY=$(tty)
+            gpg --quiet --decrypt "$CRED_DIR/${service}_${username}.gpg" 2>/dev/null
+        else
+            echo "No credential found for $service:$username" >&2
+            exit 1
+        fi
+        ;;
+    "list")
+        echo "Stored credentials:"
+        ls -1 "$CRED_DIR"/*.gpg 2>/dev/null | sed 's|.*/||; s|\.gpg$||' | sed 's|_|:|'
+        ;;
+    "delete")
+        if [ $# -ne 3 ]; then
+            echo "Usage: $0 delete <service> <username>"
+            exit 1
+        fi
+        service="$2"
+        username="$3"
+        rm -f "$CRED_DIR/${service}_${username}.gpg"
+        echo "Credential deleted for $service:$username"
+        ;;
+    *)
+        echo "Usage: $0 {set|get|list|delete} [args...]"
+        echo "  set <service> <username> <token>  - Store encrypted credential"
+        echo "  get <service> <username>          - Retrieve credential"  
+        echo "  list                              - List stored credentials"
+        echo "  delete <service> <username>       - Delete credential"
+        exit 1
+        ;;
+esac

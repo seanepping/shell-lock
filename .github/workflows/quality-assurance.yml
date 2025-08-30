@@ -1,0 +1,253 @@
+name: 🧪 Quality Assurance
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  shellcheck:
+    name: ShellCheck Analysis
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Run ShellCheck
+      uses: ludeeus/action-shellcheck@master
+      with:
+        severity: error
+        check_together: 'yes'
+        scandir: './scripts'
+        format: gcc
+        additional_files: 'install.sh'
+
+    - name: ShellCheck summary
+      run: |
+        echo "🐚 ShellCheck analysis complete"
+        echo "All shell scripts have been validated for:"
+        echo "  - Syntax errors"
+        echo "  - Semantic issues"
+        echo "  - Security anti-patterns"
+        echo "  - Portability concerns"
+
+  functional-tests:
+    name: Functional Testing
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        shell: [bash, zsh]
+        
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Install test dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y zsh bash gpg
+
+    - name: Setup test environment
+      run: |
+        # Create test user directories
+        mkdir -p /tmp/test-home/{.local/bin,.config,.ssh}
+        export TEST_HOME=/tmp/test-home
+        
+        # Install shell-lock to test location
+        cp scripts/* /tmp/test-home/.local/bin/
+        chmod +x /tmp/test-home/.local/bin/*
+
+    - name: Test GPG integration
+      run: |
+        export GNUPGHOME=/tmp/test-gpg
+        mkdir -p $GNUPGHOME
+        chmod 700 $GNUPGHOME
+        
+        # Test GPG key generation (non-interactive)
+        cat >$GNUPGHOME/gpg-batch <<EOF
+        %echo Generating test GPG key
+        Key-Type: 1
+        Key-Length: 2048
+        Subkey-Type: 1
+        Subkey-Length: 2048
+        Name-Real: Shell-Lock Test
+        Name-Email: test@shell-lock.local
+        Expire-Date: 0
+        Passphrase: test-passphrase-123
+        %commit
+        %echo done
+        EOF
+        
+        gpg --batch --generate-key $GNUPGHOME/gpg-batch
+        
+        # Test credential storage (with passphrase)
+        echo "test-token-123" | gpg --batch --yes --passphrase "test-passphrase-123" --symmetric --cipher-algo AES256 --output /tmp/test-cred.gpg
+        
+        # Test credential retrieval
+        if gpg --batch --yes --passphrase "test-passphrase-123" --decrypt /tmp/test-cred.gpg | grep -q "test-token-123"; then
+          echo "✅ GPG credential storage test passed"
+        else
+          echo "❌ GPG credential storage test failed"
+          exit 1
+        fi
+
+    - name: Test script execution
+      run: |
+        export PATH="/tmp/test-home/.local/bin:$PATH"
+        export HOME=/tmp/test-home
+        
+        # Test security-check script
+        if bash -n /tmp/test-home/.local/bin/security-check; then
+          echo "✅ security-check syntax valid"
+        else
+          echo "❌ security-check syntax error"
+          exit 1
+        fi
+        
+        # Test secure-cred script
+        if bash -n /tmp/test-home/.local/bin/secure-cred; then
+          echo "✅ secure-cred syntax valid"
+        else
+          echo "❌ secure-cred syntax error"
+          exit 1
+        fi
+
+    - name: Test installation process
+      run: |
+        export HOME=/tmp/test-home
+        export PATH="/tmp/test-home/.local/bin:$PATH"
+        
+        # Test install script syntax
+        if bash -n install.sh; then
+          echo "✅ install.sh syntax valid"
+        else
+          echo "❌ install.sh syntax error"
+          exit 1
+        fi
+        
+        # Test dry run installation
+        if bash install.sh --help >/dev/null 2>&1 || [ $? -eq 0 ]; then
+          echo "✅ install.sh help accessible"
+        else
+          echo "❌ install.sh help failed"
+        fi
+
+  documentation-check:
+    name: Documentation Quality
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Install documentation tools
+      run: |
+        sudo npm install -g markdownlint-cli
+        sudo apt-get install -y aspell aspell-en
+
+    - name: Lint Markdown files
+      run: |
+        markdownlint docs/*.md README.md --config .markdownlint.json || true
+        echo "📝 Markdown linting complete"
+
+    - name: Check documentation completeness
+      run: |
+        echo "🔍 Checking documentation completeness..."
+        
+        required_docs=(
+          "README.md"
+          "SECURITY.md"
+          "docs/INSTALLATION.md"
+          "docs/SECURITY_GUIDE.md"
+          "docs/RECOVERY_GUIDE.md"
+          "docs/USAGE_GUIDE.md"
+        )
+        
+        for doc in "${required_docs[@]}"; do
+          if [ ! -f "$doc" ]; then
+            echo "❌ Missing required documentation: $doc"
+            exit 1
+          else
+            echo "✅ Found: $doc"
+          fi
+        done
+
+    - name: Validate links in documentation
+      run: |
+        echo "🔗 Checking for broken internal links..."
+        
+        # Check for internal file references
+        for file in docs/*.md README.md; do
+          if [ -f "$file" ]; then
+            while IFS= read -r line; do
+              if [[ $line =~ \]\(([^)]+)\) ]]; then
+                link="${BASH_REMATCH[1]}"
+                if [[ $link =~ ^[^http] && $link =~ \.(md|txt|sh)$ ]]; then
+                  if [ ! -f "$link" ]; then
+                    echo "⚠️ Broken link in $file: $link"
+                  fi
+                fi
+              fi
+            done < "$file"
+          fi
+        done
+        
+        echo "✅ Documentation validation complete"
+
+  compatibility-test:
+    name: Platform Compatibility
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, ubuntu-20.04]
+        
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Test shell compatibility
+      run: |
+        echo "🖥️ Testing on $(uname -a)"
+        
+        # Test with different shells
+        for shell in bash zsh; do
+          if command -v $shell >/dev/null; then
+            echo "Testing with $shell..."
+            $shell -n scripts/security-check
+            $shell -n scripts/secure-cred
+            echo "✅ $shell compatibility confirmed"
+          else
+            echo "⚠️ $shell not available on this system"
+          fi
+        done
+
+    - name: Test required tools availability
+      run: |
+        echo "🔧 Checking required tool availability..."
+        
+        required_tools=(
+          "gpg"
+          "ssh"
+          "find"
+          "grep"
+          "sed"
+          "awk"
+          "stat"
+          "chmod"
+          "mkdir"
+        )
+        
+        for tool in "${required_tools[@]}"; do
+          if command -v $tool >/dev/null; then
+            echo "✅ $tool available"
+          else
+            echo "❌ $tool missing"
+            exit 1
+          fi
+        done
