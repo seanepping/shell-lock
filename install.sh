@@ -33,6 +33,31 @@ info() {
     echo -e "${BLUE}[INFO]${NC} $*"
 }
 
+# Email validation function
+validate_email() {
+    local email="$1"
+    
+    # Check for null/empty input
+    if [[ -z "$email" ]]; then
+        error "Empty email provided"
+        return 1
+    fi
+    
+    # Length validation
+    if [[ ${#email} -gt 254 ]]; then
+        error "Email too long (max 254 characters)"
+        return 1
+    fi
+    
+    # Basic email format validation
+    if [[ ! "$email" =~ ^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$ ]]; then
+        error "Invalid email format"
+        return 1
+    fi
+    
+    return 0
+}
+
 # Check if running on supported platform
 check_platform() {
     case "$(uname -s)" in
@@ -296,7 +321,11 @@ setup_ssh_security() {
         
         if [[ $REPLY =~ ^[Yy]$ ]]; then
             read -p "Enter your email for the SSH key: " email
-            if [[ -n "$email" ]]; then
+            
+            # Validate email input
+            if ! validate_email "$email"; then
+                warn "SSH key generation skipped due to invalid email"
+            else
                 ssh-keygen -t ed25519 -f "$HOME/.ssh/github_ed25519" -C "$email"
                 chmod 600 "$HOME/.ssh/github_ed25519"
                 chmod 644 "$HOME/.ssh/github_ed25519.pub"

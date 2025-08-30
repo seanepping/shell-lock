@@ -1,33 +1,323 @@
-# 🔧 Shell-Lock Installation Guide
+# 🔧 Shell-Lock Comprehensive Installation Guide
 
-## Prerequisites
+## 🎯 Tested Environments & Requirements
 
-Before installing Shell-Lock, ensure you have the following tools available:
+### ✅ Confirmed Testing
 
-- **GPG**: For credential encryption
-- **SSH**: For secure authentication
-- **Git**: For version control integration
-- **sha256sum**: For integrity verification
-- **Bash/Zsh**: Shell environments to protect
+**Shell-Lock has been tested on:**
 
-### Platform Support
+- **WSL2** (Windows Subsystem for Linux 2)
+- **Ubuntu** (tested versions available to project)
 
-- ✅ **Linux** (Ubuntu 18.04+, Debian 10+, RHEL 8+, etc.)
-- ✅ **WSL** (Windows Subsystem for Linux)
-- 🔄 **macOS** (experimental support)
+### 🔄 Community Testing Welcome
 
-## Quick Installation
+**We welcome community testing and feedback for:**
+
+- **macOS** - Community feedback appreciated
+- **Other Linux distributions** - Community verification helpful
+- **BSD systems** - Community testing needed
+
+### ❌ Known Incompatible Platforms
+
+- **Windows PowerShell/CMD** - Use WSL2 instead
+- **Alpine Linux** - Different shell behavior, compatibility unknown
+
+## 🔐 Prerequisites & Security Requirements
+
+**⚠️ CRITICAL:** Shell-Lock does NOT include dependency management. You must install and manage all prerequisites yourself from official sources only.
+
+### Required System Tools
+
+**Ubuntu/Debian:**
 
 ```bash
-# Clone the repository
-git clone <repository-url> ~/dev/shell-lock
+# Update package list first
+sudo apt update
+
+# Install required tools
+sudo apt install -y gpg git openssh-client coreutils
+
+# Verify installation
+gpg --version && git --version && ssh -V && sha256sum --version
+```
+
+**RHEL/CentOS/Fedora:**
+
+```bash
+# Install required tools
+sudo dnf install -y gnupg2 git openssh-clients coreutils
+
+# Verify installation
+gpg --version && git --version && ssh -V && sha256sum --version
+```
+
+**macOS (via Homebrew):**
+
+```bash
+# Install Homebrew if not already installed
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+
+# Install required tools
+brew install gnupg git openssh coreutils
+
+# Verify installation
+gpg --version && git --version && ssh -V && gsha256sum --version
+```
+
+### 🛡️ Security Verification
+
+**Before proceeding, verify all tools are properly installed:**
+
+```bash
+# Comprehensive prerequisite check
+for tool in gpg ssh git sha256sum; do
+    if command -v "$tool" >/dev/null 2>&1; then
+        echo "✅ $tool: $(command -v "$tool")"
+        $tool --version | head -1
+    else
+        echo "❌ $tool: MISSING - Install from official repositories only"
+        exit 1
+    fi
+done
+
+echo "✅ All prerequisites satisfied"
+```
+
+**⚠️ SECURITY WARNING:** Only install prerequisites from official package repositories. Never use `curl | bash`, `wget | sh`, or similar methods as these are common social engineering attack vectors.
+
+## 🚀 Secure Installation Process
+
+### Step 1: Repository Verification
+
+```bash
+# Clone from official repository only
+git clone https://github.com/seanepping/shell-lock.git ~/dev/shell-lock
 
 # Navigate to directory
 cd ~/dev/shell-lock
 
-# Run installation
-./install.sh
+# SECURITY: Verify repository contents
+echo "Repository contents:"
+ls -la
+
+echo -e "\nVerifying this is the official repository:"
+git remote -v
+
+echo -e "\nChecking recent commits:"
+git log --oneline -5
+
+echo -e "\nReviewing installation script header:"
+head -20 install.sh
 ```
+
+### Step 2: Installation Script Review
+
+**⚠️ ALWAYS review installation scripts before running:**
+
+```bash
+# Review the complete installation script
+less install.sh
+
+# Check for suspicious patterns
+grep -n "curl\|wget\|rm.*-rf\|sudo\|eval" install.sh
+
+# Verify script uses secure practices
+grep -n "set -euo pipefail" install.sh
+```
+
+### Step 3: Secure Installation
+
+```bash
+# Run installation with logging
+./install.sh 2>&1 | tee install.log
+
+# Review installation log
+less install.log
+
+# Verify installation completed successfully
+if command -v shell-lock >/dev/null 2>&1; then
+    echo "✅ Installation successful"
+    shell-lock help
+else
+    echo "❌ Installation failed"
+    exit 1
+fi
+```
+
+## 🔧 Post-Installation Setup
+
+### Initial Security Configuration
+
+```bash
+# Step 1: Run guided security setup
+shell-lock setup
+
+# Step 2: Create initial secure backups
+shell-lock backup-all
+
+# Step 3: Perform security baseline audit
+shell-lock audit
+
+# Step 4: Verify installation integrity
+shell-lock verify
+```
+
+### GitHub Integration (Secure Method)
+
+```bash
+# Generate secure SSH key for GitHub
+ssh-keygen -t ed25519 -C "your_email@example.com"
+
+# Add public key to GitHub account
+cat ~/.ssh/id_ed25519.pub
+# Copy output and add to https://github.com/settings/keys
+
+# Test SSH connection
+ssh -T git@github.com
+
+# Store GitHub token securely (if needed for CLI)
+secure-cred set github yourusername ghp_your_token_here
+
+# Login using encrypted credentials
+gh-secure auth login yourusername
+```
+
+## 🔍 Installation Verification
+
+### Comprehensive Verification Checklist
+
+```bash
+# 1. Check all scripts are installed and executable
+for script in shell-lock secure-cred gh-secure security-check secure-recovery dev-startup; do
+    if [[ -x "$HOME/.local/bin/$script" ]]; then
+        echo "✅ $script: Installed and executable"
+    else
+        echo "❌ $script: Missing or not executable"
+    fi
+done
+
+# 2. Verify directory structure and permissions
+echo -e "\n🔍 Checking directory structure:"
+ls -la ~/.local/bin/shell-lock* ~/.local/bin/secure-* ~/.local/bin/security-* ~/.local/bin/gh-* ~/.local/bin/dev-*
+ls -ld ~/.config/shell-lock ~/.local/share/secure-backups
+
+# 3. Test core functionality
+echo -e "\n🧪 Testing core functionality:"
+shell-lock help >/dev/null && echo "✅ shell-lock: Working"
+secure-cred >/dev/null && echo "✅ secure-cred: Working"
+security-check --help >/dev/null 2>&1 && echo "✅ security-check: Working"
+
+# 4. Verify PATH configuration
+echo -e "\n🛤️  PATH verification:"
+if [[ ":$PATH:" == *":$HOME/.local/bin:"* ]]; then
+    echo "✅ ~/.local/bin is in PATH"
+else
+    echo "⚠️  ~/.local/bin not in PATH - add to shell config"
+    echo "   Add: export PATH=\"\$HOME/.local/bin:\$PATH\""
+fi
+
+# 5. Security verification
+echo -e "\n🔐 Security verification:"
+shell-lock audit >/dev/null 2>&1 && echo "✅ Security audit: Passed"
+```
+
+## 🔧 Platform-Specific Configurations
+
+### WSL2 Specific Setup
+
+```bash
+# Verify WSL environment
+if [[ -n "$WSL_DISTRO_NAME" ]]; then
+    echo "✅ WSL2 detected: $WSL_DISTRO_NAME"
+
+    # WSL-specific optimizations are automatically applied
+    # Check WSL-aware security features
+    shell-lock audit | grep -i wsl
+
+else
+    echo "ℹ️  Not running in WSL"
+fi
+
+# WSL-specific SSH considerations
+echo "🔑 SSH key location for WSL:"
+echo "  Store keys in Linux filesystem: ~/.ssh/"
+echo "  Avoid Windows filesystem: /mnt/c/..."
+```
+
+### macOS Specific Notes
+
+```bash
+# macOS users may need to adapt SSH config
+if [[ "$(uname)" == "Darwin" ]]; then
+    echo "🍎 macOS detected"
+    echo "⚠️  May need to remove UseKeychain from SSH config"
+    echo "   Edit ~/.ssh/config and comment out macOS-specific options"
+fi
+```
+
+## ⚠️ Troubleshooting Installation Issues
+
+### Common Installation Problems
+
+**Problem: Missing prerequisites**
+
+```bash
+# Solution: Install from official sources
+sudo apt update && sudo apt install -y gpg git openssh-client coreutils
+```
+
+**Problem: Permission denied errors**
+
+```bash
+# Solution: Ensure proper permissions
+chmod +x install.sh
+# Run without sudo - installs to user directory only
+```
+
+**Problem: PATH not updated**
+
+```bash
+# Solution: Add to shell configuration
+echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.zshrc
+echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
+source ~/.zshrc  # or ~/.bashrc
+```
+
+**Problem: GPG not working**
+
+```bash
+# Solution: Test GPG functionality
+echo "test" | gpg --symmetric --cipher-algo AES256 | gpg --decrypt
+
+# If fails, may need to generate GPG key
+gpg --full-generate-key
+```
+
+### Getting Help
+
+**If installation fails:**
+
+1. **Check prerequisites**: Run prerequisite verification script
+2. **Review logs**: Check `install.log` for error details
+3. **Test in isolation**: Try in fresh container or test user
+4. **Check platform support**: Ensure your platform is supported
+5. **Report issues**: Use GitHub Issues for non-security problems
+
+**For security issues**: See `SECURITY.md` for responsible disclosure
+
+## 📚 Next Steps
+
+After successful installation:
+
+1. **Read the documentation**: `~/.config/shell-lock/docs/`
+2. **Complete security setup**: `shell-lock setup`
+3. **Learn essential commands**: `docs/USAGE_GUIDE.md`
+4. **Set up GitHub integration**: Follow secure credential management guide
+5. **Regular security audits**: `shell-lock audit`
+
+---
+
+**🔒 Security is a journey, not a destination. Keep your tools updated and stay vigilant.**
 
 ## Manual Installation Steps
 
@@ -203,6 +493,21 @@ rm -rf ~/.config/shell-lock
 2. **Backup Existing Configs**: Always backup your existing configurations before installation
 3. **Test in Safe Environment**: Test Shell-Lock in a non-production environment first
 4. **Understand Changes**: Make sure you understand what each security control does
+
+## Important Disclaimers
+
+**Testing and Compatibility:**
+
+- **Limited Testing**: This software has been tested only on WSL2 and Ubuntu environments
+- **No Guarantees**: We make no claims about safety, security, or functionality on other systems
+- **User Responsibility**: You must test thoroughly in your environment before deployment
+- **Community Feedback**: We welcome testing reports for other platforms but cannot guarantee compatibility
+
+**Security Limitations:**
+
+- **No Security Guarantees**: This toolkit provides features but cannot guarantee protection against all threats
+- **Configuration Required**: Proper security requires understanding and configuring each feature appropriately
+- **Regular Updates**: Security is an ongoing process requiring regular updates and monitoring
 
 ## Next Steps
 

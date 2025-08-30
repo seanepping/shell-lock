@@ -1,208 +1,392 @@
-# 🔐 Shell-Lock: Comprehensive Shell Security Hardening Toolkit
+# 🔐 Shell-Lock: Shell Security Enhancement Toolkit
 
-A portable security toolkit for hardening development environments against shell-based attacks, credential theft, and environment variable vulnerabilities.
+Security tools for development environments, providing encrypted credential storage and shell configuration protection.
 
 ## 🎯 Project Overview
 
-**Shell-Lock** provides enterprise-grade security for developer workstations by implementing defense-in-depth protection across all shell entry points and development tools.
+**Shell-Lock** provides security tools for developer workstations, focusing on encrypted  
+credential storage and shell configuration monitoring. This toolkit includes features  
+that may help with some common development security concerns.
 
-### 🚨 Problem Statement
+### 💡 Project Origin
 
-Modern development environments face numerous security threats:
+I created this project after discovering that GitHub CLI was storing my authentication token  
+in plain text. This led me to realize there were several basic security practices I could  
+improve in my development environment:
 
-- **Plain-text credential storage** (GitHub CLI, cloud tools)
-- **Environment variable theft** via compromised shells
-- **Shell configuration injection** attacks
-- **Unprotected backup and recovery** mechanisms
-- **Multiple shell entry points** (zsh, bash, profile, etc.)
-- **WSL-specific vulnerabilities** and PATH manipulation
+- Plain-text credential storage in various tools
+- No integrity checking for shell configuration files
+- Insecure backup and recovery practices
+- No encrypted storage for API keys and tokens
 
-### ✅ Solution Features
+Shell-Lock is my solution for addressing these specific issues with simple, auditable tools.
 
-- **Multi-Shell Protection**: Comprehensive coverage of all shell entry points
-- **Secure Credential Storage**: GPG-encrypted credential management
-- **SSH Security**: Passphrase-protected key generation and management
-- **Integrity Verification**: Cryptographic backup verification with SHA-256
-- **WSL Compatibility**: Windows Subsystem for Linux aware monitoring
-- **Emergency Recovery**: Sanitized emergency shell environments
-- **Audit Trails**: Comprehensive logging and monitoring
+## 🎯 What Shell-Lock Actually Does
 
-## 🚀 Quick Start
+**Primary Functions:**
+
+- **Encrypted Credential Storage**: GPG-based encryption for tokens and API keys
+- **Shell Configuration Monitoring**: Basic integrity checking for shell configs
+- **GitHub CLI Wrapper**: Secure wrapper using encrypted credential storage
+- **Emergency Shell Access**: Clean shell environments for troubleshooting
+
+## 🚨 Security Areas Addressed
+
+Shell-Lock provides tools that may help with:
+
+- ✅ **Credential Theft**: Replaces plain-text credential storage with GPG encryption
+- ✅ **Backup Tampering**: Cryptographic verification of backup files
+- ⚠️ **Shell Configuration Changes**: Basic integrity monitoring and restoration
+- ⚠️ **Input Validation**: Limited protection against injection in included scripts
+
+## ⚠️ What Shell-Lock Does NOT Protect Against
+
+**Important Limitations:**
+
+- ❌ **Social Engineering**: Only basic input validation, not comprehensive protection
+- ❌ **Supply Chain Attacks**: No specific supply chain protections
+- ❌ **Environment Variable Attacks**: Minimal protection
+- ❌ **PATH Manipulation**: No comprehensive PATH protection
+- ❌ **Most Security Vulnerabilities**: This is a limited toolkit, not a security suite
+
+## 🔧 Tested Environments
+
+**Shell-Lock has been tested on:**
+
+- ✅ **WSL2** (Windows Subsystem for Linux 2)
+- ✅ **Ubuntu** (tested on available versions)
+
+**Community testing welcome for:**
+
+- 🔄 **Other Linux distributions** - May work but requires community verification
+- 🔄 **macOS** - Community feedback appreciated
+- 🔄 **BSD systems** - Community testing needed
+
+**We welcome community contributions, testing reports, and feedback for expanding  
+platform support. Please share your testing results via GitHub issues.**
+
+**Shell Compatibility:**
+
+- ✅ **Zsh** - Primary shell with feature support
+- ✅ **Bash** - Compatibility and protection features
+- ✅ **POSIX shells** - Profile-based protection
+
+## ⚠️ Prerequisites & Dependencies
+
+**Shell-Lock does NOT include dependency management.** You must install and manage these prerequisites:
+
+### Required System Tools
 
 ```bash
-# Clone and install
-git clone <repo-url> ~/dev/shell-lock
+# Ubuntu/Debian
+sudo apt update && sudo apt install -y gpg git openssh-client coreutils
+
+# RHEL/CentOS/Fedora
+sudo dnf install -y gnupg2 git openssh-clients coreutils
+
+# macOS (via Homebrew)
+brew install gnupg git openssh coreutils
+```
+
+### Verification Command
+
+```bash
+# Verify all prerequisites are installed
+for tool in gpg ssh git sha256sum; do
+    command -v "$tool" >/dev/null && echo "✅ $tool" || echo "❌ $tool MISSING"
+done
+```
+
+**⚠️ SECURITY NOTE:** Only install tools from official package repositories. Never use `curl | bash` or similar methods to install prerequisites, as these are common social engineering attack vectors.
+
+## 🚀 Installation & Quick Start
+
+### Step 1: Clone Repository (Security Conscious)
+
+```bash
+# Verify you're cloning from the official repository
+git clone https://github.com/seanepping/shell-lock.git ~/dev/shell-lock
 cd ~/dev/shell-lock
+
+# SECURITY: Verify the repository contents before running any scripts
+ls -la  # Check for suspicious files
+head -20 install.sh  # Review installation script header
+```
+
+### Step 2: Secure Installation
+
+```bash
+# Run installation (will show what it's doing)
 ./install.sh
 
-# Basic hardening
+# Verify installation completed successfully
+shell-lock help
+```
+
+### Step 3: Initial Security Setup
+
+```bash
+# Run guided security setup
 shell-lock setup
 
-# Create secure backups
+# Create initial secure backups
 shell-lock backup-all
 
-# Run security audit
+# Perform comprehensive security audit
 shell-lock audit
 ```
 
-**⚠️ Important:** After making legitimate changes to your shell configs, update the integrity baseline:
+### Step 4: GitHub Authentication (Secure Method)
 
 ```bash
-rm ~/.local/share/file-integrity.txt && shell-lock audit
-```
+# Generate secure SSH key for GitHub
+ssh-keygen -t ed25519 -C "your_email@example.com"
 
-**📖 For detailed usage instructions, see:** `docs/USAGE_GUIDE.md`
+# Store GitHub token securely (encrypted)
+secure-cred set github yourusername ghp_your_secure_token
+
+# Login using encrypted credentials
+gh-secure auth login yourusername
+
+# Test secure authentication
+gh-secure repo list
+```
 
 ## 📁 Project Structure
 
 ```ascii
 shell-lock/
-├── README.md                 # This file
-├── install.sh               # Main installation script
-├── scripts/                 # Core security scripts
-│   ├── secure-setup         # Initial system hardening
-│   ├── secure-recovery      # Backup/recovery with integrity
-│   ├── security-check       # Comprehensive security audit
-│   └── dev-startup          # Secure development environment
-├── templates/               # Configuration templates
-│   ├── zshrc.template       # Secure zsh configuration
-│   ├── bashrc.template      # Secure bash configuration
-│   └── ssh-config.template  # SSH security configuration
-├── docs/                    # Documentation
-│   ├── INSTALLATION.md      # Installation guide
-│   ├── SECURITY_GUIDE.md    # Security features explained
-│   ├── RECOVERY_GUIDE.md    # Emergency recovery procedures
-│   └── TROUBLESHOOTING.md   # Common issues and solutions
-└── examples/                # Example configurations
-    ├── wsl-setup.sh         # WSL-specific setup
-    └── cloud-creds.sh       # Cloud credential hardening
+├── README.md                    # Project overview and usage guide
+├── install.sh                  # Installation script
+├── SECURITY.md                 # Security policy and vulnerability reporting
+├── scripts/                    # Main security tools
+│   ├── dev-startup             # Development environment startup
+│   ├── secure-cred             # Encrypted credential management
+│   ├── gh-secure               # GitHub CLI wrapper with encryption
+│   ├── secure-recovery         # Backup/recovery with integrity verification
+│   ├── security-check          # Basic security audit tool
+│   └── fix-shell-startup       # Shell configuration repair tool
+├── templates/                  # Configuration templates
+│   ├── zshrc.template          # Zsh configuration template
+│   ├── bashrc.template         # Bash configuration template
+│   └── ssh-config.template     # SSH configuration template
+├── docs/                       # Documentation
+│   ├── INSTALLATION.md         # Installation guide
+│   ├── SECURITY_GUIDE.md       # Security features documentation
+│   ├── USAGE_GUIDE.md          # Usage scenarios and FAQ
+│   └── RECOVERY_GUIDE.md       # Emergency recovery procedures
+└── examples/                   # Platform-specific examples
+    └── wsl-setup.sh            # WSL-specific setup
 ```
 
-## 🛡️ Security Features
+## � Technical Implementation
 
-### 1. Multi-Shell Entry Point Protection
+### Core Components
 
-- **Zsh**: Primary shell with security integration
-- **Bash**: Secondary shell protection
-- **POSIX shells**: Profile-based protection
-- **Login shells**: Login-specific configurations
-- **System-wide**: Monitoring of system configurations
+**Shell-Lock consists of these main scripts:**
 
-### 2. Secure Credential Management
+- **secure-cred**: GPG-based credential encryption/decryption script
+- **gh-secure**: GitHub CLI wrapper that uses encrypted credentials
+- **security-check**: Basic file integrity checker using SHA-256 hashes
+- **Emergency shell**: Simple clean environment script
 
-- **GPG Encryption**: AES256 symmetric encryption for secrets
-- **SSH Key Security**: Ed25519 keys with mandatory passphrases
-- **GitHub CLI**: Secure SSH-based authentication
-- **Cloud Tools**: Protected credential storage
+### Basic Security Features
 
-### 3. Integrity Verification System
+**What the scripts actually implement:**
 
-- **SHA-256 Checksums**: Cryptographic verification of all backups
-- **Tamper Detection**: Real-time monitoring of configuration changes
-- **Atomic Operations**: Safe backup and restoration procedures
-- **Audit Trails**: Comprehensive logging of all security events
+- **Input Validation**: Basic sanitization in included scripts to prevent path traversal
+- **GPG Encryption**: Uses standard GPG with AES256 for credential files
+- **File Permissions**: Sets 600/700 permissions on sensitive files
+- **Hash Verification**: SHA-256 checksums for backup file integrity
+- **Error Handling**: Scripts use `set -euo pipefail` for better error detection
 
-### 4. WSL-Specific Protections
+### Limitations
 
-- **Windows PATH Exclusion**: Security checks ignore `/mnt/c/` paths
-- **Cross-platform Compatibility**: Works in both WSL and native Linux
-- **WSL-aware Monitoring**: Focused on Linux-side security
+**Important technical limitations:**
 
-## 🔧 Core Tools
+- **No Real-time Monitoring**: Only checks integrity when manually run
+- **Basic Input Validation**: Limited to preventing obvious injection attempts
+- **No Comprehensive Protection**: Does not implement security controls beyond what's described
+- **Manual Operation**: Most security checks require user to run commands manually
 
-### `shell-lock` - Main Command Interface
+## 🔧 Essential Commands
 
-```bash
-shell-lock setup           # Initial security setup
-shell-lock backup-all      # Create secure backups
-shell-lock restore-zsh     # Restore shell configuration
-shell-lock audit           # Run security audit
-shell-lock emergency       # Emergency clean shell
-shell-lock verify          # Verify backup integrity
-```
-
-### `security-check` - Comprehensive Security Audit
-
-- File integrity monitoring
-- Shell security validation
-- Suspicious command detection
-- Permission verification
-- Threat detection and reporting
-
-### `secure-recovery` - Tamper-Resistant Recovery
-
-- Cryptographic integrity verification
-- Secure file permissions (600/700)
-- Clean emergency environments
-- Comprehensive audit trails
-- Atomic operations with rollback
-
-## 📊 Security Coverage Matrix
-
-| Attack Vector          | Protection Method         | Detection            |
-| ---------------------- | ------------------------- | -------------------- |
-| Shell config injection | File integrity monitoring | ✅ Real-time         |
-| Environment poisoning  | Shell security checks     | ✅ Session startup   |
-| Credential theft       | GPG encryption            | ✅ Access control    |
-| PATH manipulation      | PATH validation           | ✅ Startup scan      |
-| Backup tampering       | SHA-256 verification      | ✅ Active monitoring |
-| Recovery attacks       | Integrity verification    | ✅ Pre-restoration   |
-
-## 🔄 Recovery Procedures
-
-### Emergency Access
+### Daily Operations
 
 ```bash
-# Clean emergency shell
-/usr/bin/env -i HOME="$HOME" USER="$USER" \
-  PATH="/usr/local/bin:/usr/bin:/bin" TERM="$TERM" \
-  /bin/bash --norc --noprofile
+# Security audit (run regularly)
+shell-lock audit
 
-# Or use shell-lock
+# Create secure backups before system changes
+shell-lock backup-all
+
+# Verify backup integrity
+shell-lock verify
+
+# Emergency clean shell (if system compromised)
 shell-lock emergency
 ```
 
-### Configuration Restoration
+### Credential Management
 
 ```bash
-# Restore specific shell
-shell-lock restore-zsh
+# Store encrypted credentials
+secure-cred set <service> <username> <token>
 
-# Verify restoration
+# Retrieve encrypted credentials
+secure-cred get <service> <username>
+
+# List stored credentials
+secure-cred list
+
+# Delete credentials
+secure-cred delete <service> <username>
+```
+
+### GitHub Operations (Secure)
+
+```bash
+# Set up GitHub authentication
+gh-secure auth set <username> <token>
+
+# Login with encrypted credentials
+gh-secure auth login <username>
+
+# Use GitHub CLI securely
+gh-secure repo list
+gh-secure issue list
+gh-secure pr create
+```
+
+## ⚠️ Security Warnings & Best Practices
+
+### 🚨 Critical Security Warnings
+
+1. **Never run untrusted scripts** - Always review code before execution
+2. **Verify repository authenticity** - Only clone from official sources
+3. **Keep prerequisites updated** - Regularly update GPG, Git, and SSH
+4. **Use strong passphrases** - All SSH keys and GPG encryption should use strong passphrases
+5. **Regular security audits** - Run `shell-lock audit` frequently
+
+### � General Security Awareness
+
+**Important security practices when using any development tools:**
+
+- **"Quick fix" scripts**: Always review code before running - Shell-Lock scripts can be audited
+- **Fake security tools**: Only use scripts from official repositories you trust
+- **Credential harvesting**: Never provide passwords or tokens to unverified scripts
+- **Supply chain attacks**: Shell-Lock includes no third-party dependencies to reduce attack surface
+- **Malicious backups**: Shell-Lock verifies backup integrity, but you must still secure your backup storage
+
+### 📋 Security Checklist
+
+Before using Shell-Lock in production:
+
+- [ ] Verify all prerequisites are installed from official sources
+- [ ] Review installation script contents
+- [ ] Test in isolated environment first
+- [ ] Create backup of existing configurations
+- [ ] Understand emergency recovery procedures
+- [ ] Set up strong passphrases for SSH keys and GPG
+- [ ] Configure secure GitHub authentication
+- [ ] Run initial security audit
+- [ ] Document your security configuration
+
+## � What Shell-Lock Actually Provides
+
+| Feature                | What Shell-Lock Does                       | What You Must Do                        |
+| ---------------------- | ------------------------------------------ | --------------------------------------- |
+| Credential storage     | GPG AES256 encryption for stored tokens    | Manage GPG keys, use strong passphrases |
+| Basic input validation | Sanitizes inputs in included scripts       | Review and audit all scripts before use |
+| Config integrity       | SHA-256 checksums when manually run        | Run integrity checks regularly          |
+| Backup verification    | Cryptographic verification of backup files | Secure your backup storage location     |
+| Emergency shell access | Provides clean environment commands        | Know how to use emergency procedures    |
+
+## 🔄 Recovery & Emergency Procedures
+
+### Emergency Shell Access
+
+If your system is compromised, use the clean emergency shell:
+
+```bash
+# Method 1: Shell-Lock emergency mode
+shell-lock emergency
+
+# Method 2: Manual clean shell
+/usr/bin/env -i HOME="$HOME" USER="$USER"
+  PATH="/usr/local/bin:/usr/bin:/bin" TERM="$TERM"
+  /bin/bash --norc --noprofile
+```
+
+### Configuration Recovery
+
+```bash
+# Restore specific shell configuration
+shell-lock restore-zsh    # or restore-bash
+
+# Verify restoration integrity
 shell-lock verify
 
-# Full system restoration
+# Complete system restoration
 shell-lock restore-all
 ```
 
-## 🌍 Platform Support
+### Incident Response
 
-- ✅ **Linux** (Ubuntu, Debian, RHEL, etc.)
-- ✅ **WSL** (Windows Subsystem for Linux)
-- ✅ **macOS** (with minor adaptations)
-- 🔄 **FreeBSD** (planned)
+1. **Isolate the system** - Use emergency shell
+2. **Run security audit** - `shell-lock audit` for damage assessment
+3. **Check integrity** - `shell-lock verify` for backup validation
+4. **Restore from backup** - Use `shell-lock restore-all` if needed
+5. **Update security baseline** - `rm ~/.local/share/file-integrity.txt && shell-lock audit`
 
-## 🤝 Contributing
+## 🤝 Contributing & Security
+
+### Reporting Security Issues
+
+**Do NOT report security vulnerabilities in public issues.**
+
+For security vulnerabilities:
+
+1. See `SECURITY.md` for responsible disclosure
+2. Contact me directly via private channels
+3. Provide detailed reproduction steps
+4. Allow time for me to develop patches
+
+### Contributing Guidelines
 
 1. Fork the repository
-2. Create a feature branch
-3. Test on multiple platforms
-4. Submit a pull request with security impact analysis
+2. Test on WSL2 and Ubuntu environments (the platforms I've tested)
+3. Follow secure coding practices
+4. Include security impact analysis
+5. Update documentation for new features
+6. Test all security controls before submitting
 
-## 📜 License
+## 📜 License & Legal
 
 MIT License - See LICENSE file for details
 
-## ⚠️ Security Notice
+**Important Disclaimers:**
 
-This toolkit implements security measures based on real-world attack scenarios. Always test in a non-production environment first and ensure you understand the implications of each security control.
+- **Testing Scope**: I have tested Shell-Lock only on WSL2 and Ubuntu environments.  
+  I make no claims about compatibility, safety, or functionality on other systems.
+- **Security Tools**: This toolkit provides security features but I make no guarantees  
+  about preventing all security vulnerabilities or attacks.
+- **No Warranties**: This software is provided as-is without any warranties of  
+  merchantability, fitness for purpose, or security effectiveness.
+- **User Responsibility**: You must test thoroughly in your own environments  
+  and understand the security implications before deployment.
+- **Community Testing**: I welcome and encourage community testing and feedback  
+  for other platforms, but cannot guarantee functionality outside tested environments.
 
-## 📞 Support
+## 📞 Support & Documentation
 
-- **Documentation**: See `docs/` directory
-- **Issues**: GitHub Issues for bug reports
-- **Security**: For security vulnerabilities, see SECURITY.md
+- **Installation Issues**: See `docs/INSTALLATION.md`
+- **Usage Questions**: See `docs/USAGE_GUIDE.md`
+- **Security Configuration**: See `docs/SECURITY_GUIDE.md`
+- **Emergency Recovery**: See `docs/RECOVERY_GUIDE.md`
+- **Bug Reports**: GitHub Issues (non-security only)
+- **Security Issues**: See `SECURITY.md`
 
 ---
 
-**🔒 Secure your development environment before it's too late.**
+**🔒 Remember: Security is a process, not a product. Stay vigilant and keep your tools updated.**

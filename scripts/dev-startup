@@ -1,6 +1,9 @@
 #!/bin/bash
 # Development environment startup script with security and authentication
 
+# Secure shell configuration
+set -euo pipefail
+
 # Colors for output (with explicit escaping to prevent pattern interpretation)
 RED=$'\033[0;31m'
 GREEN=$'\033[0;32m'

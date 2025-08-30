@@ -2,6 +2,9 @@
 # Fix shell startup ANSI pattern matching issue
 # This script patches shell configuration files to prevent the "bad pattern: ^[[0" error
 
+# Secure shell configuration
+set -euo pipefail
+
 # Colors for output
 RED=$'\033[0;31m'
 GREEN=$'\033[0;32m'

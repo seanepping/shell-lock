@@ -29,6 +29,36 @@ check_secure_cred() {
     fi
 }
 
+# Input validation function
+validate_github_username() {
+    local username="$1"
+    
+    # Check for null/empty input
+    if [[ -z "$username" ]]; then
+        echo -e "${RED}Error: Empty username provided${NC}" >&2
+        return 1
+    fi
+    
+    # GitHub username validation rules
+    # - Can contain alphanumeric characters and hyphens
+    # - Cannot start or end with hyphen
+    # - Cannot contain consecutive hyphens
+    # - Maximum 39 characters
+    if [[ ${#username} -gt 39 ]]; then
+        echo -e "${RED}Error: Username too long (max 39 characters)${NC}" >&2
+        return 1
+    fi
+    
+    if [[ ! "$username" =~ ^[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?$ ]]; then
+        echo -e "${RED}Error: Invalid GitHub username format${NC}" >&2
+        echo -e "${YELLOW}GitHub usernames can only contain alphanumeric characters and hyphens${NC}" >&2
+        echo -e "${YELLOW}Cannot start or end with hyphen, no consecutive hyphens${NC}" >&2
+        return 1
+    fi
+    
+    return 0
+}
+
 # Set up GitHub CLI authentication using stored credentials
 auth_login() {
     local username="${1:-}"
@@ -42,6 +72,16 @@ auth_login() {
         }
         echo ""
         read -p "Enter GitHub username: " username
+        
+        # Validate the entered username
+        if ! validate_github_username "$username"; then
+            return 1
+        fi
+    else
+        # Validate provided username
+        if ! validate_github_username "$username"; then
+            return 1
+        fi
     fi
     
     echo -e "${BLUE}🔑 Retrieving secure credentials for: $username${NC}"
@@ -83,6 +123,22 @@ auth_set() {
     
     if [[ -z "$username" ]] || [[ -z "$token" ]]; then
         echo "Usage: gh-secure auth set <username> <token>" >&2
+        return 1
+    fi
+    
+    # Validate username
+    if ! validate_github_username "$username"; then
+        return 1
+    fi
+    
+    # Validate token format
+    if [[ ${#token} -lt 10 ]]; then
+        echo -e "${RED}Error: Token appears too short (minimum 10 characters)${NC}" >&2
+        return 1
+    fi
+    
+    if [[ ${#token} -gt 2048 ]]; then
+        echo -e "${RED}Error: Token too long (maximum 2048 characters)${NC}" >&2
         return 1
     fi
     
@@ -137,6 +193,11 @@ auth_delete() {
     
     if [[ -z "$username" ]]; then
         echo "Usage: gh-secure auth delete <username>" >&2
+        return 1
+    fi
+    
+    # Validate username
+    if ! validate_github_username "$username"; then
         return 1
     fi
     

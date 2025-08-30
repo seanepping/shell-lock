@@ -1,6 +1,9 @@
 #!/bin/bash
 # WSL-aware security check script
 
+# Secure shell configuration
+set -euo pipefail
+
 SECURITY_LOG="$HOME/.local/share/security-check.log"
 mkdir -p "$(dirname "$SECURITY_LOG")"
 

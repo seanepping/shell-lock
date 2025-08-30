@@ -3,67 +3,203 @@
 # Usage: secure-cred set <service> <username> <token>
 #        secure-cred get <service> <username>
 
+# Secure shell configuration
+set -euo pipefail
+
+# Input validation function
+validate_input() {
+    local input="$1"
+    local context="$2"
+    
+    # Check for null/empty input
+    if [[ -z "$input" ]]; then
+        echo "Error: Empty $context provided" >&2
+        exit 1
+    fi
+    
+    # Check for path traversal attempts
+    if [[ "$input" == *".."* ]] || [[ "$input" == *"/"* ]] || [[ "$input" == *"\\"* ]]; then
+        echo "Error: Invalid characters in $context (path traversal attempt detected)" >&2
+        exit 1
+    fi
+    
+    # Check for shell metacharacters
+    if [[ "$input" =~ [\;\&\|\`\$\(\)] ]]; then
+        echo "Error: Invalid characters in $context (shell metacharacters detected)" >&2
+        exit 1
+    fi
+    
+    # Length validation (reasonable limits)
+    if [[ ${#input} -gt 64 ]]; then
+        echo "Error: $context too long (max 64 characters)" >&2
+        exit 1
+    fi
+    
+    # Must contain only alphanumeric, dash, underscore, dot
+    if [[ ! "$input" =~ ^[a-zA-Z0-9._-]+$ ]]; then
+        echo "Error: $context contains invalid characters (only alphanumeric, dash, underscore, dot allowed)" >&2
+        exit 1
+    fi
+}
+
+# Generate secure random filename component
+generate_secure_filename() {
+    local service="$1"
+    local username="$2"
+    
+    # Create a hash-based filename to prevent predictable patterns
+    local hash=$(echo "${service}_${username}" | sha256sum | cut -d' ' -f1 | head -c 16)
+    echo "${service}_${username}_${hash}"
+}
+
+# GPG integrity validation
+validate_gpg_setup() {
+    # Check if GPG is available
+    if ! command -v gpg >/dev/null 2>&1; then
+        echo "Error: GPG is not installed or not in PATH" >&2
+        exit 1
+    fi
+    
+    # Check GPG version for security
+    local gpg_version=$(gpg --version | head -n1 | grep -o '[0-9]\+\.[0-9]\+\.[0-9]\+' | head -n1)
+    if [[ -z "$gpg_version" ]]; then
+        echo "Warning: Could not determine GPG version" >&2
+    fi
+    
+    # Ensure GPG TTY is set securely
+    if [[ -z "${GPG_TTY:-}" ]]; then
+        if tty -s; then
+            export GPG_TTY=$(tty)
+        else
+            echo "Error: No TTY available for GPG operations" >&2
+            exit 1
+        fi
+    fi
+}
+
 CRED_DIR="$HOME/.local/share/secure-credentials"
 mkdir -p "$CRED_DIR"
 chmod 700 "$CRED_DIR"
 
+# Validate GPG setup before any operations
+validate_gpg_setup
+
+# Check if any arguments provided
+if [[ $# -eq 0 ]]; then
+    echo "Usage: $0 {set|get|list|delete} [args...]" >&2
+    echo "  set <service> <username> <token>  - Store encrypted credential" >&2
+    echo "  get <service> <username>          - Retrieve credential" >&2  
+    echo "  list                              - List stored credentials" >&2
+    echo "  delete <service> <username>       - Delete credential" >&2
+    exit 1
+fi
+
 case "$1" in
     "set")
-        if [ $# -ne 4 ]; then
-            echo "Usage: $0 set <service> <username> <token>"
+        if [[ $# -ne 4 ]]; then
+            echo "Usage: $0 set <service> <username> <token>" >&2
             exit 1
         fi
         service="$2"
         username="$3"
         token="$4"
         
-        # Encrypt and store the token
-        export GPG_TTY=$(tty)
-        echo "$token" | gpg --symmetric --cipher-algo AES256 --pinentry-mode loopback --output "$CRED_DIR/${service}_${username}.gpg"
-        if [ $? -eq 0 ]; then
+        # Validate all inputs
+        validate_input "$service" "service name"
+        validate_input "$username" "username"
+        
+        # Token validation (allow more characters but still secure)
+        if [[ -z "$token" ]]; then
+            echo "Error: Empty token provided" >&2
+            exit 1
+        fi
+        if [[ ${#token} -gt 2048 ]]; then
+            echo "Error: Token too long (max 2048 characters)" >&2
+            exit 1
+        fi
+        
+        # Generate secure filename
+        filename=$(generate_secure_filename "$service" "$username")
+        filepath="$CRED_DIR/${filename}.gpg"
+        
+        # Encrypt and store the token with enhanced security
+        if echo "$token" | gpg --symmetric --cipher-algo AES256 --digest-algo SHA256 --compress-algo 0 --s2k-mode 3 --s2k-digest-algo SHA256 --s2k-count 65536 --pinentry-mode loopback --output "$filepath"; then
+            chmod 600 "$filepath"
             echo "Credential stored securely for $service:$username"
         else
-            echo "Failed to store credential - GPG encryption failed" >&2
+            echo "Error: Failed to store credential - GPG encryption failed" >&2
+            rm -f "$filepath" 2>/dev/null || true
             exit 1
         fi
         ;;
     "get")
-        if [ $# -ne 3 ]; then
-            echo "Usage: $0 get <service> <username>"
+        if [[ $# -ne 3 ]]; then
+            echo "Usage: $0 get <service> <username>" >&2
             exit 1
         fi
         service="$2"
         username="$3"
         
+        # Validate inputs
+        validate_input "$service" "service name"
+        validate_input "$username" "username"
+        
+        # Generate secure filename to locate the credential
+        filename=$(generate_secure_filename "$service" "$username")
+        filepath="$CRED_DIR/${filename}.gpg"
+        
         # Decrypt and return the token
-        if [ -f "$CRED_DIR/${service}_${username}.gpg" ]; then
-            export GPG_TTY=$(tty)
-            gpg --quiet --decrypt "$CRED_DIR/${service}_${username}.gpg" 2>/dev/null
+        if [[ -f "$filepath" ]]; then
+            if ! gpg --quiet --decrypt "$filepath" 2>/dev/null; then
+                echo "Error: Failed to decrypt credential for $service:$username" >&2
+                exit 1
+            fi
         else
-            echo "No credential found for $service:$username" >&2
+            echo "Error: No credential found for $service:$username" >&2
             exit 1
         fi
         ;;
     "list")
         echo "Stored credentials:"
-        ls -1 "$CRED_DIR"/*.gpg 2>/dev/null | sed 's|.*/||; s|\.gpg$||' | sed 's|_|:|'
+        if [[ -d "$CRED_DIR" ]] && [[ -n "$(ls -A "$CRED_DIR"/*.gpg 2>/dev/null)" ]]; then
+            for file in "$CRED_DIR"/*.gpg; do
+                [[ -f "$file" ]] || continue
+                basename "$file" .gpg | sed 's|_[a-f0-9]\{16\}$||' | sed 's|_|:|'
+            done
+        else
+            echo "  (no credentials stored)"
+        fi
         ;;
     "delete")
-        if [ $# -ne 3 ]; then
-            echo "Usage: $0 delete <service> <username>"
+        if [[ $# -ne 3 ]]; then
+            echo "Usage: $0 delete <service> <username>" >&2
             exit 1
         fi
         service="$2"
         username="$3"
-        rm -f "$CRED_DIR/${service}_${username}.gpg"
-        echo "Credential deleted for $service:$username"
+        
+        # Validate inputs
+        validate_input "$service" "service name"
+        validate_input "$username" "username"
+        
+        # Generate secure filename
+        filename=$(generate_secure_filename "$service" "$username")
+        filepath="$CRED_DIR/${filename}.gpg"
+        
+        if [[ -f "$filepath" ]]; then
+            rm -f "$filepath"
+            echo "Credential deleted for $service:$username"
+        else
+            echo "Error: No credential found for $service:$username" >&2
+            exit 1
+        fi
         ;;
     *)
-        echo "Usage: $0 {set|get|list|delete} [args...]"
-        echo "  set <service> <username> <token>  - Store encrypted credential"
-        echo "  get <service> <username>          - Retrieve credential"  
-        echo "  list                              - List stored credentials"
-        echo "  delete <service> <username>       - Delete credential"
+        echo "Usage: $0 {set|get|list|delete} [args...]" >&2
+        echo "  set <service> <username> <token>  - Store encrypted credential" >&2
+        echo "  get <service> <username>          - Retrieve credential" >&2  
+        echo "  list                              - List stored credentials" >&2
+        echo "  delete <service> <username>       - Delete credential" >&2
         exit 1
         ;;
 esac
