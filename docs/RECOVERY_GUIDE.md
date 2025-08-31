@@ -158,3 +158,67 @@ All critical vulnerabilities have been identified and mitigated:
 - ✅ Cloud credentials identified for review
 
 **Your system is now comprehensively protected against the attack vectors you were concerned about.**
+
+## Common Issues & Troubleshooting
+
+### False Positive: Security Testing Commands
+
+**Problem:** Shell startup blocked with:
+
+```
+⚠️  SECURITY WARNING: Suspicious command pattern found: rm -rf /
+🚨 SECURITY CHECK FAILED!
+🚨 EMERGENCY RECOVERY MODE
+```
+
+**Cause:** Security system detecting legitimate testing commands in shell history, such as:
+
+```bash
+./scripts/secure-cred set "test;rm -rf /" user1 token123
+```
+
+**Solution:**
+
+```bash
+# Option 1: Clear problematic commands from history
+history -d [line_number]
+
+# Option 2: Temporarily disable history checking
+# Edit /home/epps/.local/bin/security-check
+# Add 'return 0' at start of check_history() function
+
+# Option 3: Clean slate approach
+echo "[$(date)] Starting fresh after testing..." > ~/.local/share/security-check.log
+```
+
+**Prevention:** When testing security features, use isolated test environments or sanitize shell history afterward.
+
+### Recovery from Emergency Mode
+
+If your shell is stuck in emergency recovery mode:
+
+1. **Use emergency shell:**
+
+   ```bash
+   /bin/bash --norc
+   ```
+
+2. **Check what's triggering the alerts:**
+
+   ```bash
+   cat ~/.local/share/security-check.log | tail -20
+   ```
+
+3. **Restore from backup if needed:**
+
+   ```bash
+   ls -la ~/.zshrc.backup.*
+   cp ~/.zshrc.backup.YYYYMMDD_HHMMSS ~/.zshrc
+   ```
+
+4. **Reset security system:**
+   ```bash
+   rm ~/.local/share/file-integrity.txt
+   rm ~/.local/share/security-check.log
+   security-check  # Will recreate baselines
+   ```
