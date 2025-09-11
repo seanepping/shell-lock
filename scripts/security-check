@@ -147,7 +147,11 @@ check_file_integrity() {
     
     if ! diff -q "$integrity_file" "$temp_check" >/dev/null 2>&1; then
         echo "⚠️  SECURITY WARNING: Critical files have been modified since last check" | tee -a "$SECURITY_LOG"
-        echo "Run 'diff $integrity_file $temp_check' to see changes" | tee -a "$SECURITY_LOG"
+        
+        # Save comparison file for user analysis (don't delete it immediately)
+        local saved_check="$HOME/.local/share/last-integrity-check.txt"
+        cp "$temp_check" "$saved_check"
+        echo "Run 'diff $integrity_file $saved_check' to see changes" | tee -a "$SECURITY_LOG"
         
         # Check specifically for profile file changes (high priority)
         local profile_changed=false
