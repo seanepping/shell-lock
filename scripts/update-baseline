@@ -1,0 +1,141 @@
+#!/bin/bash
+
+# Update Security Baseline - Simple tool to approve legitimate changes
+# Usage: update-baseline [--force]
+
+set -euo pipefail
+
+SECURITY_LOG="$HOME/.local/share/security-check.log"
+INTEGRITY_FILE="$HOME/.local/share/file-integrity.txt"
+LAST_CHECK="$HOME/.local/share/last-integrity-check.txt"
+
+show_help() {
+    cat << EOF
+🛡️  Update Security Baseline
+
+USAGE:
+  update-baseline                 # Interactive mode - shows changes and prompts
+  update-baseline --force         # Force update without prompting
+  update-baseline --help          # Show this help
+
+DESCRIPTION:
+  This tool helps you approve legitimate file changes and update your security
+  baseline. Use this when you get security warnings for changes you made.
+
+EXAMPLES:
+  update-baseline                 # Review and approve changes
+  update-baseline --force         # Quick update (use with caution)
+
+EOF
+}
+
+show_changes() {
+    echo "🔍 Analyzing detected changes..."
+    
+    if [[ ! -f "$LAST_CHECK" ]]; then
+        echo "❌ No recent security check found. Run 'security-check' first."
+        exit 1
+    fi
+    
+    if [[ ! -f "$INTEGRITY_FILE" ]]; then
+        echo "❌ No baseline found. Creating initial baseline..."
+        cp "$LAST_CHECK" "$INTEGRITY_FILE"
+        echo "✅ Initial baseline created."
+        return 0
+    fi
+    
+    echo ""
+    echo "=== DETECTED CHANGES ==="
+    if diff -q "$INTEGRITY_FILE" "$LAST_CHECK" >/dev/null 2>&1; then
+        echo "✅ No changes detected. Baseline is current."
+        return 0
+    fi
+    
+    echo "Files that changed:"
+    diff "$INTEGRITY_FILE" "$LAST_CHECK" | grep "^[<>]" | while read line; do
+        if [[ "$line" =~ ^\< ]]; then
+            file=$(echo "$line" | awk '{print $3}')
+            echo "  ❌ Removed/Modified: $file"
+        elif [[ "$line" =~ ^\> ]]; then
+            file=$(echo "$line" | awk '{print $3}')
+            echo "  ✅ Added/Updated: $file"
+        fi
+    done
+    
+    # Check for profile file changes
+    echo ""
+    echo "=== PROFILE FILE ANALYSIS ==="
+    local profile_changed=false
+    for profile in ~/.zshrc ~/.bashrc ~/.profile ~/.zshenv ~/.zprofile ~/.bash_profile ~/.bash_login; do
+        if [[ -f "$profile" ]]; then
+            local current_hash=$(sha256sum "$profile" 2>/dev/null | awk '{print $1}')
+            if ! grep -q "$current_hash.*$profile" "$INTEGRITY_FILE" 2>/dev/null; then
+                echo "🔶 Profile modified: $profile"
+                profile_changed=true
+            fi
+        fi
+    done
+    
+    if [[ "$profile_changed" = false ]]; then
+        echo "✅ No shell profile files were modified"
+    fi
+    
+    return 1  # Changes detected
+}
+
+update_baseline() {
+    echo "📝 Updating security baseline..."
+    cp "$LAST_CHECK" "$INTEGRITY_FILE"
+    echo "✅ Baseline updated successfully!"
+    
+    # Test the new baseline
+    echo "🧪 Testing updated baseline..."
+    if security-check >/dev/null 2>&1; then
+        echo "✅ Security check now passes!"
+    else
+        echo "⚠️  Warning: Security check still shows issues. Manual review may be needed."
+    fi
+}
+
+main() {
+    case "${1:-}" in
+        --help|-h)
+            show_help
+            exit 0
+            ;;
+        --force|-f)
+            echo "🚀 Force updating baseline..."
+            if [[ -f "$LAST_CHECK" ]]; then
+                update_baseline
+            else
+                echo "❌ No recent check found. Run 'security-check' first."
+                exit 1
+            fi
+            ;;
+        "")
+            if show_changes; then
+                exit 0  # No changes
+            fi
+            
+            echo ""
+            echo "❓ Do you want to approve these changes and update the baseline?"
+            echo "   This will mark the current state as the new security baseline."
+            echo ""
+            read -p "Update baseline? (y/N): " -r response
+            
+            if [[ "$response" =~ ^[Yy]$ ]]; then
+                update_baseline
+            else
+                echo "❌ Baseline not updated. Security warnings will continue."
+                echo "💡 Use 'update-baseline --force' to update without prompting."
+            fi
+            ;;
+        *)
+            echo "❌ Unknown option: $1"
+            echo "💡 Use 'update-baseline --help' for usage information."
+            exit 1
+            ;;
+    esac
+}
+
+main "$@"

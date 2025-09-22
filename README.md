@@ -188,6 +188,7 @@ shell-lock/
 - **secure-cred**: GPG-based credential encryption/decryption script
 - **gh-secure**: GitHub CLI wrapper that uses encrypted credentials
 - **security-check**: Basic file integrity checker using SHA-256 hashes
+- **update-baseline**: Simple tool to approve legitimate file changes and update security baselines
 - **Emergency shell**: Simple clean environment script
 
 ### Basic Security Features
@@ -337,7 +338,7 @@ shell-lock restore-all
 2. **Run security audit** - `shell-lock audit` for damage assessment
 3. **Check integrity** - `shell-lock verify` for backup validation
 4. **Restore from backup** - Use `shell-lock restore-all` if needed
-5. **Update security baseline** - `rm ~/.local/share/file-integrity.txt && shell-lock audit`
+5. **Update security baseline** - `update-baseline` (approves legitimate changes)
 
 ## 🤝 Contributing & Security
 

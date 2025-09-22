@@ -160,6 +160,9 @@ case "${1:-help}" in
     "startup")
         exec "$HOME/.local/bin/dev-startup" "${@:2}"
         ;;
+    "update-baseline"|"baseline")
+        exec "$HOME/.local/bin/update-baseline" "${@:2}"
+        ;;
     "help"|*)
         cat << 'HELP_EOF'
 🔐 Shell-Lock - Comprehensive Shell Security Toolkit
@@ -173,6 +176,7 @@ Commands:
   restore-bash    Restore bash configuration from backup
   restore-all     Restore all shell configurations
   audit           Run comprehensive security audit
+  update-baseline Approve legitimate changes and update security baseline
   emergency       Start emergency clean shell
   verify          Verify backup integrity
   startup         Run development environment startup
@@ -182,6 +186,7 @@ Examples:
   shell-lock setup           # Initial installation
   shell-lock backup-all      # Create secure backups
   shell-lock audit           # Security audit
+  shell-lock update-baseline # Approve legitimate file changes
   shell-lock emergency       # Emergency shell
 
 For detailed help on specific commands, use:

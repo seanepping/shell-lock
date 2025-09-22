@@ -161,6 +161,36 @@ All critical vulnerabilities have been identified and mitigated:
 
 ## Common Issues & Troubleshooting
 
+### File Integrity Warnings
+
+**Problem:** Security check blocked with file integrity warnings:
+
+```text
+⚠️  SECURITY WARNING: Critical files have been modified since last check
+🚨 CRITICAL: Shell profile modified: /home/user/.zprofile
+```
+
+**Cause:** Legitimate changes to monitored files (shell configs, SSH files, or security scripts).
+
+**Solution:** Use the `update-baseline` tool to approve legitimate changes:
+
+```bash
+# Interactive mode - review changes and approve
+update-baseline
+
+# Quick mode - approve without prompting (use with caution)
+update-baseline --force
+
+# View help
+update-baseline --help
+```
+
+**What it shows you:**
+
+- Exactly which files changed
+- Whether shell profiles were modified (critical security indicator)
+- Clear approve/reject prompts
+
 ### False Positive: Security Testing Commands
 
 **Problem:** Shell startup blocked with:
