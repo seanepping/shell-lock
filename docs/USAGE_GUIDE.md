@@ -301,9 +301,24 @@ export GPG_TTY=$(tty)
 # Get a Personal Access Token from GitHub Settings > Developer settings
 # Store it encrypted (will prompt for GPG passphrase)
 gh-secure auth set your-username your_github_token
+```
 
+#### Step 4: Authenticate (Choose One Method)
+
+**Method A: Standard Login (Persists to gh config)**
+
+```bash
 # Login using encrypted storage (will prompt for GPG passphrase)
 gh-secure auth login your-username
+```
+
+**Method B: Session-Only (Maximum Security)**
+
+To keep the token in memory only (never written to disk by gh CLI):
+
+```bash
+# Export token to current session only
+export GITHUB_TOKEN=$(secure-cred get github your-username)
 ```
 
 ### Using GitHub CLI Securely

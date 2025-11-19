@@ -246,13 +246,28 @@ secure-cred delete <service> <username>
 
 ### GitHub Operations (Secure)
 
+#### Method 1: Standard Login (Persists to gh config)
+
 ```bash
 # Set up GitHub authentication
 gh-secure auth set <username> <token>
 
 # Login with encrypted credentials
 gh-secure auth login <username>
+```
 
+#### Method 2: Session-Only (Maximum Security)
+
+To keep the token in memory only (never written to disk by gh CLI):
+
+```bash
+# Export token to current session only
+export GITHUB_TOKEN=$(secure-cred get github <username>)
+```
+
+#### Running Commands
+
+```bash
 # Use GitHub CLI securely
 gh-secure repo list
 gh-secure issue list
